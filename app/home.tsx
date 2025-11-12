@@ -8,9 +8,10 @@ export default function Home() {
         justifyContent: "center",
         alignItems: "center",
         backgroundColor:"#202930",
+
       }}
     >
-      <Text>Audiary</Text>
+      <Text>Edit app/index.tsx to edit this screen.</Text>
     </View>
   );
 }
