@@ -597,11 +597,11 @@ export default function Search() {
           paddingHorizontal: 16,
         }}
       >
-        <TouchableOpacity onPress={() => router.navigate("/home")} style={{ flex: 1, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => router.replace("/home")} style={{ flex: 1, alignItems: "center" }}>
           <Feather name="home" size={22} color={COLORS.subtext} />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.navigate("")} style={{ flex: 1, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => router.replace("")} style={{ flex: 1, alignItems: "center" }}>
           <Feather name="search" size={22} color={COLORS.active} />
         </TouchableOpacity>
 
@@ -621,11 +621,11 @@ export default function Search() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={() => router.navigate("/activity")} style={{ flex: 1, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => router.replace("/activity")} style={{ flex: 1, alignItems: "center" }}>
           <Feather name="message-circle" size={22} color={COLORS.subtext} />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.navigate("/profile")} style={{ flex: 1, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => router.replace("/profile")} style={{ flex: 1, alignItems: "center" }}>
           <Feather name="user" size={22} color={COLORS.subtext} />
         </TouchableOpacity>
       </View>

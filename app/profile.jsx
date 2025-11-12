@@ -3,6 +3,7 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { memo, useMemo, useState } from "react";
 import {
+  FlatList,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -31,6 +32,13 @@ const SIZES = {
   avatar: 72,
   album: 140,
   footerHeight: 58,
+
+  // Slider card sizes
+  cover: 104,
+  coverRadius: 12,
+  cardGap: 12,
+  cardWidth: 104,
+  titleTop: 8,
 };
 
 const TABS = ["Home", "Reviews", "Lists"];
@@ -38,8 +46,6 @@ const TABS = ["Home", "Reviews", "Lists"];
 /* Equal-size button dimensions */
 const BUTTON_W = 90;
 const BUTTON_H = 36;
-
-/* Slightly smaller avatar */
 const AVATAR_SCALE = 1.5;
 
 export default function Profile() {
@@ -65,24 +71,22 @@ export default function Profile() {
         {/* ===== Header ===== */}
         <View style={styles.headerWrap}>
           <View style={styles.headerRow}>
-            {/* LEFT SIDE: Avatar + buttons */}
             <View style={styles.leftCol}>
               <View style={styles.avatar}>
                 <Feather name="user" size={48} color={COLORS.subtext} />
               </View>
 
               <View style={styles.actionsRow}>
-                <TouchableOpacity activeOpacity={0.85} style={styles.equalBtn} onPress={() => {}}>
+                <TouchableOpacity activeOpacity={0.85} style={styles.equalBtn}>
                   <Text style={styles.equalBtnText}>Edit</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity activeOpacity={0.85} style={styles.equalBtn2} onPress={() => {}}>
+                <TouchableOpacity activeOpacity={0.85} style={styles.equalBtn2}>
                   <Feather name="share-2" size={18} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* RIGHT SIDE: Username + stats (perfectly centered vertically) */}
             <View style={styles.rightCol}>
               <View style={styles.centeredRightBlock}>
                 <Text numberOfLines={1} style={styles.nameBig}>
@@ -92,8 +96,8 @@ export default function Profile() {
                 {!!displayName && <Text style={styles.displayName}>{displayName}</Text>}
 
                 <View style={styles.inlineRow}>
-                  <InlineStat count={stats.reviews} label="reviews" />
                   <InlineStat count={stats.followers} label="followers" />
+                  <InlineStat count={stats.reviews} label="reviews" />
                   <InlineStat count={stats.ratings} label="ratings" />
                 </View>
               </View>
@@ -110,11 +114,24 @@ export default function Profile() {
 
         {/* ===== Content ===== */}
         {activeTab === "Home" && (
-          <Section title="Recent Activity">
-            <View style={styles.emptyWrap}>
-              <Text style={styles.placeholderText}>You have not rated anything yet.</Text>
-            </View>
-          </Section>
+          <>
+            <Section title="Favourite Albums">
+              <PlaceholderSlider type="album" count={10} />
+            </Section>
+
+            <Section title="Favourite Songs">
+              <PlaceholderSlider type="song" count={12} />
+            </Section>
+
+            <Section title="Favourite Artists">
+              <PlaceholderSlider type="artist" count={12} />
+            </Section>
+
+            {/* Added extra bottom margin here */}
+            <Section title="Recent Activity" bottomMargin>
+              <PlaceholderSlider type="activity" count={14} />
+            </Section>
+          </>
         )}
 
         {activeTab === "Reviews" && (
@@ -149,6 +166,46 @@ function InlineStat({ count, label }) {
   );
 }
 
+/* ===== Horizontal placeholder slider (covers with title under) ===== */
+const PlaceholderSlider = memo(function PlaceholderSlider({ count = 10, type = "album" }) {
+  const items = Array.from({ length: count }).map((_, i) => ({
+    id: `${type}-${i + 1}`,
+    title:
+      type === "album"
+        ? `Album ${i + 1}`
+        : type === "song"
+        ? `Song ${i + 1}`
+        : type === "artist"
+        ? `Artist ${i + 1}`
+        : `Item ${i + 1}`,
+  }));
+
+  const renderItem = ({ item }) => (
+    <View style={styles.sliderItem}>
+      <View
+        style={[
+          styles.cover,
+          type === "artist" ? styles.coverCircle : null,
+        ]}
+      />
+      <Text numberOfLines={1} style={styles.coverTitle}>
+        {item.title}
+      </Text>
+    </View>
+  );
+
+  return (
+    <FlatList
+      horizontal
+      data={items}
+      keyExtractor={(it) => it.id}
+      renderItem={renderItem}
+      contentContainerStyle={styles.sliderContent}
+      showsHorizontalScrollIndicator={false}
+    />
+  );
+});
+
 /* ===== Footer Bar ===== */
 function FooterBar({ router, insets }) {
   return (
@@ -172,11 +229,11 @@ function FooterBar({ router, insets }) {
           paddingHorizontal: 16,
         }}
       >
-        <TouchableOpacity onPress={() => router.navigate("/home")} style={{ flex: 1, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => router.replace("/home")} style={{ flex: 1, alignItems: "center" }}>
           <Feather name="home" size={22} color={COLORS.subtext} />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.navigate("/search")} style={{ flex: 1, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => router.replace("/search")} style={{ flex: 1, alignItems: "center" }}>
           <Feather name="search" size={22} color={COLORS.subtext} />
         </TouchableOpacity>
 
@@ -196,11 +253,11 @@ function FooterBar({ router, insets }) {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={() => router.navigate("/activity")} style={{ flex: 1, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => router.replace("/activity")} style={{ flex: 1, alignItems: "center" }}>
           <Feather name="message-circle" size={22} color={COLORS.subtext} />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.navigate("/profile")} style={{ flex: 1, alignItems: "center" }}>
+        <TouchableOpacity onPress={() => router.replace("/profile")} style={{ flex: 1, alignItems: "center" }}>
           <Feather name="user" size={22} color={COLORS.active} />
         </TouchableOpacity>
       </View>
@@ -220,8 +277,8 @@ const Tab = memo(function Tab({ label, active = false, onPress }) {
   );
 });
 
-const Section = ({ title, rightIcon, children }) => (
-  <View style={styles.section}>
+const Section = ({ title, rightIcon, children, bottomMargin }) => (
+  <View style={[styles.section, bottomMargin ? { marginBottom: 80 } : null]}>
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {rightIcon}
@@ -234,19 +291,11 @@ const Section = ({ title, rightIcon, children }) => (
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.screen },
   screen: { flex: 1, backgroundColor: COLORS.screen },
-  scrollContent: { paddingBottom: 40 },
+  scrollContent: { paddingBottom: 10 },
 
   headerWrap: { paddingHorizontal: SIZES.pad, paddingTop: SIZES.pad + 2 },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-
-  leftCol: {
-    width: SIZES.avatar * AVATAR_SCALE + 10,
-    marginRight: 12,
-    alignItems: "center",
-  },
+  headerRow: { flexDirection: "row", alignItems: "flex-start" },
+  leftCol: { width: SIZES.avatar * AVATAR_SCALE + 10, marginRight: 12, alignItems: "center" },
   avatar: {
     width: SIZES.avatar * AVATAR_SCALE,
     height: SIZES.avatar * AVATAR_SCALE,
@@ -256,14 +305,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 10,
   },
-  actionsRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 10,
-  },
+  actionsRow: { flexDirection: "row", alignItems: "flex-end", gap: 10 },
   equalBtn: {
     marginTop: 10,
-    marginLeft:50,
+    marginLeft: 50,
     width: BUTTON_W,
     height: BUTTON_H,
     borderRadius: 24,
@@ -272,52 +317,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  equalBtn2: {
-    marginTop: 10,
-    width: 40,
-    height: BUTTON_H,
-    
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  equalBtn2: { marginTop: 10, width: 40, height: BUTTON_H, alignItems: "center", justifyContent: "center" },
   equalBtnText: { color: COLORS.text, fontSize: 16, fontWeight: "700" },
 
-  rightCol: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  centeredRightBlock: {
-    justifyContent: "center",
-    height: SIZES.avatar * AVATAR_SCALE,
-  },
-
-  nameBig: {
-    color: COLORS.text,
-    fontSize: 30,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-    lineHeight: 34,
-    marginBottom: 2,
-  },
+  rightCol: { flex: 1, justifyContent: "center" },
+  centeredRightBlock: { justifyContent: "center", height: SIZES.avatar * AVATAR_SCALE },
+  nameBig: { color: COLORS.text, fontSize: 30, fontWeight: "800", lineHeight: 34, marginBottom: 2 },
   displayName: { color: COLORS.subtext, fontSize: 14, marginTop: 2 },
-
-  inlineRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    marginTop: 4,
-  },
+  inlineRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 4 },
   inlineGroup: { flexDirection: "row", alignItems: "center" },
-  inlineCount: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  inlineLabel: {
-    color: COLORS.subtext,
-    fontSize: 13,
-    fontWeight: "500",
-  },
+  inlineCount: { color: COLORS.text, fontSize: 14, fontWeight: "800" },
+  inlineLabel: { color: COLORS.subtext, fontSize: 13, fontWeight: "500" },
 
   tabsBar: {
     borderTopWidth: 1,
@@ -332,7 +342,7 @@ const styles = StyleSheet.create({
   tabText: { color: COLORS.subtext, fontWeight: "600", fontSize: 14 },
   tabTextActive: { color: COLORS.text, fontWeight: "700" },
   tabUnderline: { height: 2, width: "100%", borderRadius: 2, backgroundColor: "transparent" },
-  tabUnderlineOn: { backgroundColor: COLORS.text },
+  tabUnderlineOn: { backgroundColor: COLORS.active },
 
   section: { marginTop: 18 },
   sectionHeader: {
@@ -345,4 +355,20 @@ const styles = StyleSheet.create({
   sectionTitle: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
   emptyWrap: { paddingHorizontal: SIZES.pad, paddingVertical: 20 },
   placeholderText: { color: COLORS.subtext },
+
+  sliderContent: { paddingHorizontal: SIZES.pad },
+  sliderItem: { width: SIZES.cardWidth, marginRight: SIZES.cardGap },
+  cover: {
+    width: SIZES.cover,
+    height: SIZES.cover,
+    borderRadius: SIZES.coverRadius,
+    backgroundColor: COLORS.card,
+  },
+  coverCircle: { borderRadius: SIZES.cover / 2 },
+  coverTitle: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: SIZES.titleTop,
+  },
 });
