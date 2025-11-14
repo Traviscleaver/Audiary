@@ -1,14 +1,12 @@
 import React from "react";
 import { Text, View, StyleSheet } from "react-native";
 import { useAuth } from "../lib/AuthContext";
-import LogoutButton from "./components/LogoutButton";
 
 export default function Home() {
   const { status, token } = useAuth();
 
   return (
     <View style={styles.container}>
-      <LogoutButton />
       <Text style={styles.title}>Home</Text>
       <Text style={styles.subtitle}>Status: {status}</Text>
       <Text style={styles.token}>Token: {token || "none"}</Text>
