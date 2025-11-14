@@ -4,36 +4,19 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet
+  StyleSheet,
+  Platform
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 
-/**
- * AuthGate
- * --------
- * A reusable wrapper that asks users to log in only when an action requires it.
- *
- * Usage:
- *   <AuthGate>
- *     <TouchableOpacity onPress={() => onDoProtectedThing()}>
- *       <Text>Write a Review</Text>
- *     </TouchableOpacity>
- *   </AuthGate>
- *
- * Inside, call `gate(() => protectedAction())` to guard an action:
- *   const { gate } = useAuthGate();
- *   <TouchableOpacity onPress={() => gate(() => doSomething()))} />
- *
- * But this component exposes a render prop for convenience:
- *   <AuthGate>
- *     {(gate) => (
- *       <TouchableOpacity onPress={() => gate(() => doProtected()))}>
- *         <Text>Protected</Text>
- *       </TouchableOpacity>
- *     )}
- *   </AuthGate>
- */
+// Unified token getter
+async function getStoredToken() {
+  if (Platform.OS === "web") {
+    return localStorage.getItem("auth_token");
+  }
+  return SecureStore.getItemAsync("auth_token");
+}
 
 export default function AuthGate({ children }) {
   const router = useRouter();
@@ -42,8 +25,8 @@ export default function AuthGate({ children }) {
 
   const checkToken = useCallback(async () => {
     try {
-      const token = await SecureStore.getItemAsync("auth_token");
-      return !!token; // if you ever add real logins, this will be true when logged in
+      const token = await getStoredToken();
+      return !!token; // true = logged in, false = guest
     } catch {
       return false;
     }
@@ -52,11 +35,13 @@ export default function AuthGate({ children }) {
   const gate = useCallback(
     async (action) => {
       const authed = await checkToken();
+
       if (authed) {
         action && action();
         return;
       }
-      // not authed → open modal and queue the action
+
+      // Not logged in → show modal
       setQueuedAction(() => action);
       setVisible(true);
     },
@@ -71,18 +56,18 @@ export default function AuthGate({ children }) {
   };
 
   const continueGuest = () => {
-    // They chose to remain guest → just close modal, do not run protected action.
-    // (If you want to run it anyway, call queuedAction?.() here instead.)
+    // They stay as guest, modal closes.
     setVisible(false);
   };
 
-  // Allow both child-as-element and child-as-function(gate)
+  // Support function-as-children or regular children
   const content =
     typeof children === "function" ? children(gate) : children;
 
   return (
     <>
       {content}
+
       <Modal visible={visible} transparent animationType="fade">
         <View style={styles.overlay}>
           <View style={styles.card}>
@@ -95,15 +80,13 @@ export default function AuthGate({ children }) {
               <TouchableOpacity style={styles.secondary} onPress={continueGuest}>
                 <Text style={styles.secondaryText}>Not now</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.primary}
-                onPress={goLogin}
-              >
+
+              <TouchableOpacity style={styles.primary} onPress={goLogin}>
                 <Text style={styles.primaryText}>Log in</Text>
               </TouchableOpacity>
             </View>
 
-            {/* If you want “Run anyway as guest”, uncomment below:
+            {/* Optional: Run protected action anyway as guest
             <TouchableOpacity
               style={[styles.secondary, { marginTop: 10 }]}
               onPress={() => {
