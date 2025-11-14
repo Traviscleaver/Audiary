@@ -1,48 +1,25 @@
 // screens/profile.jsx
-import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, {
-  memo,
-  useMemo,
-  useRef,
-  useState
-} from "react";
 import {
   Animated,
+  COLORS,
+  Feather,
   FlatList,
+  SIZES,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+  View,
+  memo,
+  useMemo,
+  useRef,
+  useRouter,
+  useSafeAreaInsets,
+  useState,
+} from "./lib/imports";
 
-/* ===== Theme ===== */
-const COLORS = {
-  screen: "#121212",
-  card: "#191919",
-  text: "#ffffff",
-  subtext: "#bfc6cf",
-  divider: "#232323",
-  active: "#1db954",
-  danger: "#ff5757",
-  faint: "#ffffff60",
-};
-
-const SIZES = {
-  pad: 16,
-  radius: 12,
-  avatar: 72,
-  footerHeight: 58,
-
-  cover: 104,
-  coverRadius: 12,
-  cardGap: 12,
-  cardWidth: 104,
-};
 
 const TABS = ["Home", "Reviews", "Lists"];
 const AVATAR_SCALE = 1.5;
