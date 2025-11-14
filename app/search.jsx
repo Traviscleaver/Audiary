@@ -1,784 +1,421 @@
-// screens/profile.jsx
-import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import {
-  memo,
-  useMemo,
-  useRef,
-  useState
-} from "react";
-import {
+  ActivityIndicator,
   Animated,
+  COLORS,
+  Dimensions,
+  Feather,
   FlatList,
-  SafeAreaView,
+  SIZES,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+  View,
+  useEffect,
+  useRouter,
+  useSafeAreaInsets,
+  useState
+} from "./lib/imports";
 
-/* ===== Theme ===== */
-const COLORS = {
-  screen: "#121212",
-  card: "#191919",
-  text: "#ffffff",
-  subtext: "#bfc6cf",
-  divider: "#232323",
-  active: "#1db954",
-  danger: "#ff5757",
-  faint: "#ffffff60",
-};
+/* 🔥 Shared Components */
+import FooterBar from "./components/MainNavigationFooter";
+import HeaderBar from "./components/OverlayHeaderBar";
+import SectionList from "./components/SearchPreviewSection";
+import DetailBody from "./components/SearchResultDetailContent";
+import RowItem from "./components/SearchResultRow";
+import SubDetailView from "./components/SubResultDetailOverlay";
 
-const SIZES = {
-  pad: 16,
-  radius: 12,
-  avatar: 72,
-  footerHeight: 58,
+/* 🔥 Shared Hooks */
+import useSearchHome from "./hooks/useHomeSearchController";
+import useDetail from "./hooks/userDetailOverlayController";
+import useOverlay from "./hooks/useViewAllOverlayController";
 
-  cover: 104,
-  coverRadius: 12,
-  cardGap: 12,
-  cardWidth: 104,
-};
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
-const TABS = ["Home", "Reviews", "Lists"];
-const AVATAR_SCALE = 1.5;
-
-export default function Profile() {
-  const router = useRouter();
+export default function Search() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
-  const [handle, setHandle] = useState("user123");
-  const [givenName, setGivenName] = useState("Travis");
-  const [familyName, setFamilyName] = useState("Cleaver");
-  const [email, setEmail] = useState("travis@example.com");
-  const [location, setLocation] = useState("Vancouver BC");
-  const [website, setWebsite] = useState("");
-  const [pronoun, setPronoun] = useState("He / his");
-  const [activeTab, setActiveTab] = useState("Home");
+  /* 🔥 Shared search system from home.jsx */
+  const {
+    searchOpen,
+    query,
+    albums,
+    artists,
+    tracksRes,
+    searchAnim,
+    searchInputRef,
+    loadingSearch,
 
-  const stats = useMemo(
-    () => ({
-      reviews: 2,
-      followers: 2,
-      ratings: 22,
-    }),
-    []
-  );
+    openSearchOverlay,
+    closeSearchOverlay,
+    panResponderSearch,
+    setQuery,
+  } = useSearchHome();
 
-  /* ========== SETTINGS OVERLAY ========== */
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [bioOverlayOpen, setBioOverlayOpen] = useState(false);
-  const [emailOverlayOpen, setEmailOverlayOpen] = useState(false);
+  /* 🔥 Shared “View All” Overlay */
+  const {
+    overlayType,
+    overlayData,
+    overlayLoading,
+    overlayAnim,
+    overlayQuery,
+    openOverlay,
+    closeOverlay,
+    panResponderOverlay,
+  } = useOverlay();
 
-  const settingsAnim = useRef(new Animated.Value(0)).current;
+  /* 🔥 Shared Detail + Subdetail */
+  const {
+    detailOpen,
+    detailItem,
+    detailType,
+    detailAnim,
+    detailScrollRef,
+    detailScrollYRef,
+    albumTracks,
+    detailLoading,
+    showAllAlbumTracks,
 
-  const openSettings = () => {
-    setSettingsOpen(true);
-    Animated.timing(settingsAnim, {
-      toValue: 1,
-      duration: 240,
-      useNativeDriver: true,
-    }).start();
+    openDetail,
+    closeDetail,
+
+    subDetailOpen,
+    subDetailItem,
+    subDetailType,
+    subDetailAnim,
+    subDetailScrollRef,
+
+    openSubDetail,
+    closeSubDetail,
+    panResponderDetail,
+    panResponderSubDetail,
+    setShowAllAlbumTracks,
+  } = useDetail();
+
+  /* ============================================
+     🔥 TOP TABS (Music / Reviews / Lists / Users)
+     ============================================ */
+  const [activeTopTab, setActiveTopTab] = useState("Music");
+  const [tabsWidth, setTabsWidth] = useState(0);
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
+
+  useEffect(() => {
+    if (!tabsWidth) return;
+    const tabs = ["Music", "Reviews", "Lists", "Users"];
+    const idx = Math.max(0, tabs.indexOf(activeTopTab));
+    const slot = tabsWidth / 4;
+    setIndicator({ left: idx * slot, width: slot });
+  }, [activeTopTab, tabsWidth]);
+
+  const TopTabs = () => {
+    const tabs = ["Music", "Reviews", "Lists", "Users"];
+
+    return (
+      <View style={{ backgroundColor: COLORS.navbar }}>
+        <View
+          onLayout={(e) => setTabsWidth(e.nativeEvent.layout.width)}
+          style={{
+            position: "relative",
+            flexDirection: "row",
+            justifyContent: "space-around",
+            paddingHorizontal: 8,
+            borderBottomColor: COLORS.divider,
+            borderBottomWidth: 1,
+          }}
+        >
+          {/* Active underline */}
+          <View
+            style={{
+              position: "absolute",
+              bottom: -1,
+              left: indicator.left,
+              width: indicator.width,
+              height: 2,
+              backgroundColor: COLORS.active,
+            }}
+          />
+
+          {tabs.map((t) => {
+            const active = activeTopTab === t;
+            return (
+              <TouchableOpacity
+                key={t}
+                onPress={() => setActiveTopTab(t)}
+                style={{ paddingVertical: 12, flex: 1, alignItems: "center" }}
+              >
+                <Text
+                  style={{
+                    color: active ? COLORS.text : COLORS.faint,
+                    fontWeight: active ? "700" : "600",
+                    fontSize: 16,
+                  }}
+                >
+                  {t}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
   };
 
-  const closeSettings = () => {
-    Animated.timing(settingsAnim, {
-      toValue: 0,
-      duration: 240,
-      useNativeDriver: true,
-    }).start(() => setSettingsOpen(false));
-  };
-
-  /* ========== SUB-OVERLAYS ========== */
-  const subAnim = useRef(new Animated.Value(0)).current;
-
-  const openBioOverlay = () => {
-    setBioOverlayOpen(true);
-    Animated.timing(subAnim, {
-      toValue: 1,
-      duration: 240,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeBioOverlay = () => {
-    Animated.timing(subAnim, {
-      toValue: 0,
-      duration: 240,
-      useNativeDriver: true,
-    }).start(() => setBioOverlayOpen(false));
-  };
-
-  const openEmailOverlay = () => {
-    setEmailOverlayOpen(true);
-    Animated.timing(subAnim, {
-      toValue: 1,
-      duration: 240,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeEmailOverlay = () => {
-    Animated.timing(subAnim, {
-      toValue: 0,
-      duration: 240,
-      useNativeDriver: true,
-    }).start(() => setEmailOverlayOpen(false));
-  };
-
+  /* ============================================
+     🔥 RENDER
+     ============================================ */
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={{ flex: 1, backgroundColor: COLORS.screen }}>
+      {/* STATUS BAR BG */}
+      <View
+        style={{
+          height: insets.top,
+          backgroundColor: COLORS.navbar,
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+        }}
+      />
 
-      {/* TOP RIGHT BUTTONS */}
-      <View style={[styles.topRightActions, { top: insets.top + 6 }]}>
-        <TouchableOpacity style={styles.iconBtn}>
-          <Feather name="share-2" size={20} color={COLORS.text} />
-        </TouchableOpacity>
+      {/* NAVBAR */}
+      <View
+        style={{
+          paddingTop: insets.top + 8,
+          paddingHorizontal: 16,
+          paddingBottom: 12,
+          backgroundColor: COLORS.navbar,
+        }}
+      >
+        <Text
+          style={{
+            color: COLORS.text,
+            fontSize: 30,
+            fontWeight: "900",
+            textAlign: "center",
+            marginBottom: 6,
+          }}
+        >
+          Audiary
+        </Text>
 
-        <TouchableOpacity style={styles.iconBtn} onPress={openSettings}>
-          <Feather name="more-horizontal" size={22} color={COLORS.text} />
-        </TouchableOpacity>
+        {/* SEARCH INPUT */}
+        <View
+          style={{ width: "100%", flexDirection: "row", alignItems: "center" }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: COLORS.screen,
+              borderRadius: 999,
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              flex: 1,
+            }}
+          >
+            <Feather
+              name="search"
+              size={18}
+              color={COLORS.subtext}
+              style={{ marginRight: 6 }}
+            />
+
+            <TextInput
+              ref={searchInputRef}
+              placeholder="Search for music"
+              placeholderTextColor={COLORS.subtext}
+              value={query}
+              onChangeText={setQuery}
+              onFocus={() => {
+                if (!searchOpen) openSearchOverlay();
+              }}
+              style={{
+                flex: 1,
+                fontSize: 16,
+                color: COLORS.text,
+                paddingVertical: 6,
+              }}
+            />
+
+            {searchOpen && query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery("")}>
+                <Feather name="x" size={18} color={COLORS.subtext} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {searchOpen && (
+            <TouchableOpacity
+              onPress={closeSearchOverlay}
+              style={{ paddingLeft: 10 }}
+            >
+              <Text style={{ color: COLORS.subtext, fontSize: 16 }}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {/* === MAIN PROFILE (UNCHANGED) === */}
-      <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.headerWrap}>
-          <View style={styles.headerRow}>
-            <View style={styles.leftCol}>
-              <View style={styles.avatar}>
-                <Feather name="user" size={48} color={COLORS.subtext} />
-              </View>
-            </View>
+      {/* 🔥 TABS */}
+      <TopTabs />
 
-            <View style={styles.rightCol}>
-              <View style={styles.centeredRightBlock}>
-                <Text style={styles.nameBig}>{handle}</Text>
-
-                <View style={styles.inlineRow}>
-                  <InlineStat count={stats.followers} label="followers" />
-                  <InlineStat count={stats.reviews} label="reviews" />
-                  <InlineStat count={stats.ratings} label="ratings" />
-                </View>
-              </View>
-            </View>
+      {/* RESULTS */}
+      <ScrollView
+        style={{ flex: 1, paddingHorizontal: 16, paddingTop: 12 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
+        {loadingSearch ? (
+          <View style={{ marginTop: 50, alignItems: "center" }}>
+            <ActivityIndicator size="large" color={COLORS.text} />
           </View>
-        </View>
-
-        {/* TABS */}
-        <View style={styles.tabsBar}>
-          {TABS.map((t) => (
-            <Tab key={t} label={t} active={activeTab === t} onPress={() => setActiveTab(t)} />
-          ))}
-        </View>
-
-        {/* CONTENT */}
-        {activeTab === "Home" && (
+        ) : activeTopTab === "Music" ? (
           <>
-            <Section title="Favourite Albums">
-              <PlaceholderSlider type="album" count={10} />
-            </Section>
-            <Section title="Favourite Songs">
-              <PlaceholderSlider type="song" count={12} />
-            </Section>
-            <Section title="Favourite Artists">
-              <PlaceholderSlider type="artist" count={12} />
-            </Section>
-            <Section title="Recent Activity" bottomMargin>
-              <PlaceholderSlider type="activity" count={14} />
-            </Section>
+            <SectionList
+              title="Albums"
+              data={albums}
+              type="Albums"
+              onOpen={openDetail}
+              onViewAll={(type) => openOverlay(type, query)}
+            />
+
+            <SectionList
+              title="Tracks"
+              data={tracksRes}
+              type="Tracks"
+              onOpen={openDetail}
+              onViewAll={(type) => openOverlay(type, query)}
+            />
+
+            <SectionList
+              title="Artists"
+              data={artists}
+              type="Artists"
+              onOpen={openDetail}
+              onViewAll={(type) => openOverlay(type, query)}
+            />
           </>
-        )}
-
-        {activeTab === "Reviews" && (
-          <Section title="Reviews">
-            <View style={styles.emptyWrap}>
-              <Text style={styles.placeholderText}>No reviews yet.</Text>
-            </View>
-          </Section>
-        )}
-
-        {activeTab === "Lists" && (
-          <Section title="Lists">
-            <View style={styles.emptyWrap}>
-              <Text style={styles.placeholderText}>No lists yet.</Text>
-            </View>
-          </Section>
+        ) : (
+          <View style={{ marginTop: 40, alignItems: "center" }}>
+            <Text style={{ color: COLORS.faint }}>
+              No content for {activeTopTab} yet.
+            </Text>
+          </View>
         )}
       </ScrollView>
 
+      {/* FOOTER */}
       <FooterBar router={router} insets={insets} />
 
       {/* ======================================================
-                       SETTINGS OVERLAY
+         🔥 VIEW ALL OVERLAY
          ====================================================== */}
-      {settingsOpen && (
-        <Animated.View style={[styles.settingsOverlay, { opacity: settingsAnim }]}>
-          <TouchableOpacity
-            onPress={closeSettings}
-            style={styles.overlayBackground}
-            activeOpacity={1}
+      {overlayType && (
+        <Animated.View
+          {...panResponderOverlay.panHandlers}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: COLORS.screen,
+            transform: [{ translateX: overlayAnim }],
+            zIndex: 999,
+          }}
+        >
+          <HeaderBar
+            title={`"${overlayQuery}" in ${overlayType}`}
+            onBack={closeOverlay}
           />
 
-          <Animated.View
-            style={[
-              styles.settingsSheet,
-              {
-                height: "85%",
-                transform: [
-                  {
-                    translateY: settingsAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [700, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              padding: 16,
+              paddingBottom: SIZES.footerHeight + insets.bottom + 24,
+            }}
           >
-            {/* HEADER */}
-            <View style={styles.sheetHeader}>
-              <TouchableOpacity onPress={closeSettings}>
-                <Text style={styles.sheetCancel}>Cancel</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.sheetTitle}>Settings</Text>
-
-              <TouchableOpacity onPress={closeSettings}>
-                <Text style={styles.sheetSave}>Save</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView>
-
-              {/* ACCOUNT */}
-              <Text style={styles.smallHeader}>ACCOUNT</Text>
-
-              {/* USERNAME */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Username</Text>
-                <TextInput
-                  value={handle}
-                  onChangeText={setHandle}
-                  placeholder="Username"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                  maxLength={36}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                />
+            {overlayLoading ? (
+              <View style={{ marginTop: 50, alignItems: "center" }}>
+                <ActivityIndicator size="large" color={COLORS.text} />
               </View>
-
-              {/* PASSWORD & AUTH */}
-              <TouchableOpacity style={styles.rowTouchable}>
-                <Text style={styles.editLabel}>Password and authentication</Text>
-                <Feather name="chevron-right" size={18} color={COLORS.subtext} />
-              </TouchableOpacity>
-
-              {/* SIGN OUT */}
-              <TouchableOpacity style={styles.rowTouchable}>
-                <Text style={[styles.editLabel, { color: COLORS.danger }]}>Sign out</Text>
-              </TouchableOpacity>
-
-              {/* PROFILE */}
-              <Text style={styles.smallHeader}>PROFILE</Text>
-
-              {/* GIVEN */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Given name</Text>
-                <TextInput
-                  value={givenName}
-                  onChangeText={setGivenName}
-                  placeholder="Given name"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                />
-              </View>
-
-              {/* FAMILY */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Family name</Text>
-                <TextInput
-                  value={familyName}
-                  onChangeText={setFamilyName}
-                  placeholder="Family name"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                />
-              </View>
-
-              {/* EMAIL */}
-              <TouchableOpacity style={styles.rowTouchable} onPress={openEmailOverlay}>
-                <Text style={styles.editLabel}>Email address</Text>
-                <View style={styles.rightInline}>
-                  <Text
-                    style={styles.editValue}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {email}
-                  </Text>
-                  <Feather name="chevron-right" size={18} color={COLORS.subtext} />
-                </View>
-              </TouchableOpacity>
-
-              {/* LOCATION */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Location</Text>
-                <TextInput
-                  value={location}
-                  onChangeText={setLocation}
-                  placeholder="Location"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                />
-              </View>
-
-              {/* WEBSITE */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Website</Text>
-                <TextInput
-                  value={website}
-                  onChangeText={setWebsite}
-                  placeholder="Website"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                />
-              </View>
-
-              {/* BIO */}
-              <TouchableOpacity style={styles.rowTouchable} onPress={openBioOverlay}>
-                <Text style={styles.editLabel}>Bio</Text>
-                <Feather name="chevron-right" size={18} color={COLORS.subtext} />
-              </TouchableOpacity>
-
-              {/* PRONOUN */}
-              <TouchableOpacity style={styles.rowTouchable}>
-                <Text style={styles.editLabel}>Pronoun</Text>
-                <View style={styles.rightInline}>
-                  <Text
-                    style={styles.editValue}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {pronoun}
-                  </Text>
-                  <Feather name="chevron-right" size={18} color={COLORS.subtext} />
-                </View>
-              </TouchableOpacity>
-
-              <View style={{ height: 80 }} />
-            </ScrollView>
-          </Animated.View>
+            ) : (
+              <FlatList
+                data={overlayData}
+                keyExtractor={(i) => String(i.id)}
+                renderItem={({ item }) => (
+                  <RowItem
+                    item={item}
+                    isArtist={overlayType === "Artists"}
+                    onPress={() => openDetail(item, overlayType)}
+                  />
+                )}
+              />
+            )}
+          </ScrollView>
         </Animated.View>
       )}
 
       {/* ======================================================
-                 SUB OVERLAY — BIO EDITOR
+         🔥 DETAIL VIEW
          ====================================================== */}
-      {bioOverlayOpen && (
-        <Animated.View style={[styles.settingsOverlay, { opacity: subAnim }]}>
-          <TouchableOpacity
-            style={styles.overlayBackground}
-            onPress={closeBioOverlay}
+      {detailOpen && (
+        <Animated.View
+          {...panResponderDetail.panHandlers}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: COLORS.screen,
+            transform: [{ translateX: detailAnim }],
+            zIndex: 1000,
+          }}
+        >
+          <HeaderBar
+            title={
+              detailType === "Tracks"
+                ? "Track"
+                : detailType === "Albums"
+                ? "Album"
+                : "Artist"
+            }
+            onBack={closeDetail}
           />
-          <Animated.View
-            style={[
-              styles.subSheet,
-              {
-                transform: [
-                  {
-                    translateY: subAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [500, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.sheetHeader}>
-              <TouchableOpacity onPress={closeBioOverlay}>
-                <Text style={styles.sheetCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.sheetTitle}>Bio</Text>
-              <TouchableOpacity onPress={closeBioOverlay}>
-                <Text style={styles.sheetSave}>Save</Text>
-              </TouchableOpacity>
-            </View>
 
-            <View style={{ padding: 16 }}>
-              <TextInput
-                multiline
-                placeholder="Write something..."
-                placeholderTextColor={COLORS.subtext}
-                style={styles.bioInput}
-              />
-            </View>
-          </Animated.View>
+          <DetailBody
+            type={detailType}
+            item={detailItem}
+            loading={detailLoading}
+            tracks={albumTracks}
+            showAll={showAllAlbumTracks}
+            setShowAll={setShowAllAlbumTracks}
+            scrollRef={detailScrollRef}
+            scrollYRef={detailScrollYRef}
+            openSubDetail={openSubDetail}
+          />
         </Animated.View>
       )}
 
       {/* ======================================================
-                 SUB OVERLAY — EMAIL EDITOR
+         🔥 SUB DETAIL VIEW
          ====================================================== */}
-      {emailOverlayOpen && (
-        <Animated.View style={[styles.settingsOverlay, { opacity: subAnim }]}>
-          <TouchableOpacity
-            style={styles.overlayBackground}
-            onPress={closeEmailOverlay}
-          />
-          <Animated.View
-            style={[
-              styles.subSheet,
-              {
-                transform: [
-                  {
-                    translateY: subAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [500, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.sheetHeader}>
-              <TouchableOpacity onPress={closeEmailOverlay}>
-                <Text style={styles.sheetCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.sheetTitle}>Email</Text>
-              <TouchableOpacity onPress={closeEmailOverlay}>
-                <Text style={styles.sheetSave}>Save</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ padding: 16 }}>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Email address"
-                placeholderTextColor={COLORS.subtext}
-                style={styles.bioInput}
-                autoCapitalize="none"
-              />
-            </View>
-          </Animated.View>
-        </Animated.View>
+      {subDetailOpen && (
+        <SubDetailView
+          subDetailAnim={subDetailAnim}
+          panResponderSubDetail={panResponderSubDetail}
+          subDetailType={subDetailType}
+          subDetailItem={subDetailItem}
+          closeSubDetail={closeSubDetail}
+          subDetailScrollRef={subDetailScrollRef}
+          insets={insets}
+        />
       )}
-
-    </SafeAreaView>
-  );
-}
-
-/* ===== Small Components ===== */
-function InlineStat({ count, label }) {
-  return (
-    <View style={styles.inlineGroup}>
-      <Text style={styles.inlineCount}>{count}</Text>
-      <Text style={styles.inlineLabel}>{label}</Text>
     </View>
   );
 }
-
-const PlaceholderSlider = memo(function Slider({ count, type }) {
-  const arr = Array.from({ length: count }).map((_, i) => ({
-    id: `${type}-${i}`,
-    title: `${type} ${i + 1}`,
-  }));
-
-  return (
-    <FlatList
-      horizontal
-      data={arr}
-      keyExtractor={(i) => i.id}
-      renderItem={({ item }) => (
-        <View style={styles.sliderItem}>
-          <View style={styles.cover} />
-          <Text style={styles.coverTitle}>{item.title}</Text>
-        </View>
-      )}
-      contentContainerStyle={styles.sliderContent}
-      showsHorizontalScrollIndicator={false}
-    />
-  );
-});
-
-function FooterBar({ router, insets }) {
-  return (
-    <View
-      style={{
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 58 + insets.bottom,
-        backgroundColor: "#000",
-        paddingBottom: insets.bottom / 2,
-      }}
-    >
-      <View style={styles.footerRow}>
-        <TouchableOpacity onPress={() => router.replace("/home")} style={styles.footerBtn}>
-          <Feather name="home" size={22} color={COLORS.subtext} />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.replace("/search")} style={styles.footerBtn}>
-          <Feather name="search" size={22} color={COLORS.subtext} />
-        </TouchableOpacity>
-
-        <View style={styles.footerBtn}>
-          <TouchableOpacity style={styles.fab}>
-            <Feather name="plus" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity onPress={() => router.replace("/activity")} style={styles.footerBtn}>
-          <Feather name="message-circle" size={22} color={COLORS.subtext} />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.replace("/profile")} style={styles.footerBtn}>
-          <Feather name="user" size={22} color={COLORS.active} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-const Tab = memo(function Tab({ label, active, onPress }) {
-  return (
-    <TouchableOpacity style={styles.tabWrap} onPress={onPress}>
-      <View style={styles.tabPad}>
-        <Text style={[styles.tabText, active && styles.tabTextActive]}>
-          {label}
-        </Text>
-      </View>
-      <View style={[styles.tabUnderline, active && styles.tabUnderlineOn]} />
-    </TouchableOpacity>
-  );
-});
-
-const Section = ({ title, children, bottomMargin }) => (
-  <View style={[styles.section, bottomMargin && { marginBottom: 80 }]}>
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-    </View>
-    {children}
-  </View>
-);
-
-/* ===== STYLES ===== */
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.screen },
-  screen: { flex: 1 },
-  scrollContent: { paddingBottom: 40 },
-
-  topRightActions: {
-    position: "absolute",
-    right: 16,
-    flexDirection: "row",
-    gap: 14,
-    zIndex: 2000,
-  },
-
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 20,
-    backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  headerWrap: { paddingHorizontal: SIZES.pad, paddingTop: SIZES.pad + 35 },
-  headerRow: { flexDirection: "row" },
-  leftCol: { width: SIZES.avatar * AVATAR_SCALE + 10, marginRight: 12 },
-  avatar: {
-    width: SIZES.avatar * AVATAR_SCALE,
-    height: SIZES.avatar * AVATAR_SCALE,
-    borderRadius: (SIZES.avatar * AVATAR_SCALE) / 2,
-    backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  rightCol: { flex: 1 },
-  centeredRightBlock: {
-    justifyContent: "center",
-    height: SIZES.avatar * AVATAR_SCALE,
-  },
-  nameBig: { color: COLORS.text, fontSize: 30, fontWeight: "800" },
-
-  inlineRow: { flexDirection: "row", gap: 22, marginTop: 8 },
-  inlineGroup: { alignItems: "center", minWidth: 60 },
-  inlineCount: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
-  inlineLabel: { color: COLORS.subtext, fontSize: 13 },
-
-  tabsBar: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: COLORS.divider,
-    flexDirection: "row",
-    paddingHorizontal: SIZES.pad,
-    marginTop: 12,
-  },
-  tabWrap: { flex: 1, alignItems: "center" },
-  tabPad: { paddingVertical: 12 },
-  tabText: { color: COLORS.subtext, fontSize: 14, fontWeight: "600" },
-  tabTextActive: { color: COLORS.text, fontWeight: "700" },
-  tabUnderline: { height: 2, width: "100%", backgroundColor: "transparent" },
-  tabUnderlineOn: { backgroundColor: COLORS.active },
-
-  section: { marginTop: 18 },
-  sectionHeader: { paddingHorizontal: SIZES.pad, marginBottom: 10 },
-  sectionTitle: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
-
-  sliderContent: { paddingHorizontal: SIZES.pad },
-  sliderItem: { width: SIZES.cardWidth, marginRight: SIZES.cardGap },
-  cover: {
-    width: SIZES.cover,
-    height: SIZES.cover,
-    backgroundColor: COLORS.card,
-    borderRadius: SIZES.coverRadius,
-  },
-  coverTitle: {
-    color: COLORS.text,
-    fontSize: 13,
-    marginTop: 8,
-    fontWeight: "700",
-  },
-
-  footerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    alignItems: "center",
-    height: "100%",
-  },
-  footerBtn: { flex: 1, alignItems: "center" },
-
-  fab: {
-    width: 40,
-    height: 40,
-    borderRadius: 22,
-    backgroundColor: COLORS.active,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  /* ========== SETTINGS ========== */
-
-  settingsOverlay: {
-    position: "absolute",
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-    zIndex: 3000,
-  },
-  overlayBackground: {
-    position: "absolute",
-    top: 0, left: 0, right: 0, bottom: 0,
-  },
-
-  settingsSheet: {
-    width: "100%",
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
-    overflow: "hidden",
-  },
-
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
-  },
-  sheetCancel: { color: COLORS.subtext, fontSize: 16 },
-  sheetTitle: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
-  sheetSave: { color: COLORS.active, fontSize: 16, fontWeight: "700" },
-
-  smallHeader: {
-    fontSize: 13,
-    color: COLORS.subtext,
-    marginLeft: 16,
-    marginTop: 18,
-    marginBottom: 6,
-  },
-
-  rowEditable: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  rowTouchable: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  editLabel: {
-    color: COLORS.text,
-    fontSize: 16,
-  },
-
-  editInput: {
-    color: COLORS.text,
-    fontSize: 16,
-    textAlign: "right",
-    padding: 0,
-    margin: 0,
-    minWidth: 80,
-    maxWidth: "60%",
-  },
-
-  editValue: {
-    color: COLORS.subtext,
-    fontSize: 16,
-    maxWidth: "60%",
-    textAlign: "right",
-  },
-
-  rightInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  /* SUB-SHEETS */
-  subSheet: {
-    height: "60%",
-    width: "100%",
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    overflow: "hidden",
-  },
-
-  bioInput: {
-    width: "100%",
-    minHeight: 180,
-    color: COLORS.text,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-});
-
