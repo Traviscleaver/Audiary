@@ -1,7 +1,7 @@
+// app/(auth)/LoginScreen.js
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -12,34 +12,49 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useAuth } from "../../lib/AuthContext";
+import { api, setToken } from "../../lib/AuthClient";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { setAuthToken } = useAuth();
 
-  const [mode, setMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  async function onSubmit() {
+  async function onLogin() {
     try {
+      setErrorMsg("");
       setLoading(true);
-      // Replace with actual API later
-      await setAuthToken("FAKE_LOGIN_TOKEN");
+
+      const res = await api("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error || "Invalid email or password.");
+        return;
+      }
+
+      await setToken(data.token);
       router.replace("/home");
-    } catch (e) {
-      Alert.alert("Error", e?.message || "Login failed");
+    } catch (err) {
+      setErrorMsg("Network error. Try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function onSkip() {
-    await setAuthToken("guest");
+  function onGuest() {
+    setToken(null); // no token = guest mode
     router.replace("/home");
+  }
+
+  function goRegister() {
+    router.push("/(auth)/RegisterScreen");
   }
 
   return (
@@ -50,12 +65,14 @@ export default function LoginScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Welcome to Audiary</Text>
-          <Text style={styles.subtitle}>
-            {mode === "login" ? "Sign in to continue" : "Create an account"}
-          </Text>
+          <Text style={styles.subtitle}>Sign in to continue</Text>
         </View>
 
         <View style={styles.form}>
+          {errorMsg !== "" && (
+            <Text style={styles.error}>{errorMsg}</Text>
+          )}
+
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -65,17 +82,6 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
           />
-
-          {mode === "register" && (
-            <TextInput
-              style={styles.input}
-              placeholder="Username"
-              placeholderTextColor="#9aa4af"
-              autoCapitalize="none"
-              value={username}
-              onChangeText={setUsername}
-            />
-          )}
 
           <TextInput
             style={styles.input}
@@ -88,27 +94,19 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={styles.primaryBtn}
-            onPress={onSubmit}
+            onPress={onLogin}
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator />
+              <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.primaryText}>
-                {mode === "login" ? "Sign In" : "Create Account"}
-              </Text>
+              <Text style={styles.primaryText}>Sign In</Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.switchMode}
-            onPress={() => setMode(mode === "login" ? "register" : "login")}
-            disabled={loading}
-          >
-            <Text style={styles.switchText}>
-              {mode === "login"
-                ? "No account? Create one"
-                : "Have an account? Sign in"}
+          <TouchableOpacity onPress={goRegister} style={{ marginTop: 12 }}>
+            <Text style={{ color: "#9aa4af", textAlign: "center" }}>
+              No account? Create one
             </Text>
           </TouchableOpacity>
 
@@ -118,8 +116,8 @@ export default function LoginScreen() {
             <View style={styles.divider} />
           </View>
 
-          <TouchableOpacity style={styles.ghostBtn} onPress={onSkip}>
-            <Text style={styles.ghostText}>Skip for now</Text>
+          <TouchableOpacity style={styles.ghostBtn} onPress={onGuest}>
+            <Text style={styles.ghostText}>Continue as Guest</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -133,6 +131,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: 24 },
   title: { color: "#fff", fontSize: 28, fontWeight: "700" },
   subtitle: { color: "#bfc6cf", marginTop: 6, fontSize: 16 },
+  error: { color: "#ff5b5b", marginBottom: 8, fontSize: 14 },
   form: { gap: 12 },
   input: {
     backgroundColor: "#1c1c1e",
@@ -151,8 +150,6 @@ const styles = StyleSheet.create({
     marginTop: 6
   },
   primaryText: { color: "#000", fontWeight: "700", fontSize: 16 },
-  switchMode: { alignItems: "center", marginTop: 10 },
-  switchText: { color: "#9aa4af" },
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",

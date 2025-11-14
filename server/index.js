@@ -1,47 +1,44 @@
-require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
-const jwt = require("jsonwebtoken");
+const dotenv = require("dotenv");
+const { pool } = require("./db"); // ✅ CommonJS import for your Postgres pool
+const authRoutes = require("./routes/auth"); // ✅ CommonJS import for routes
+
+dotenv.config();
 
 const app = express();
 
-app.use(helmet());
-app.use(cors({ origin: "*", credentials: true }));
+app.use(cors());
 app.use(express.json());
-app.use(morgan("dev"));
 
-const { JWT_SECRET = "dev-secret", PORT = 3000 } = process.env;
+console.log("Starting Audiary API server...");
 
-app.get("/", (_req, res) => res.json({ ok: true, service: "Audiary API" }));
+// ===== ROUTES =====
+app.use("/auth", authRoutes);
 
-// POST /auth/guest — issues a short-lived guest JWT
-app.post("/auth/guest", async (_req, res) => {
+// ===== DB TEST ROUTE =====
+app.get("/db-test", async (req, res) => {
   try {
-    const token = jwt.sign({ guest: true }, JWT_SECRET, { expiresIn: "3d" });
-    console.log("[/auth/guest] issued guest token");
-    return res.json({ token, guest: true });
+    const result = await pool.query("SELECT NOW()");
+    res.json({
+      success: true,
+      serverTime: result.rows[0].now,
+      message: "✅ Connected to Supabase database successfully!",
+    });
   } catch (err) {
-    console.error("guest error:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error("Database connection failed:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
 
-// sanity check endpoint to verify Authorization header works
-app.get("/auth/me", (req, res) => {
-  const hdr = req.headers.authorization || "";
-  const [, token] = hdr.split(" ");
-  if (!token) return res.status(401).json({ error: "Missing token" });
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    if (payload.guest) return res.json({ guest: true, user: null });
-    return res.json({ guest: false, user: { user_id: payload.user_id } });
-  } catch (e) {
-    return res.status(401).json({ error: "Invalid token" });
-  }
+// ===== ROOT CHECK =====
+app.get("/", (req, res) => {
+  res.send("Audiary API running");
 });
 
-app.listen(PORT, () => {
-  console.log(`API listening on http://localhost:${PORT}`);
-});
+// ===== START SERVER =====
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
