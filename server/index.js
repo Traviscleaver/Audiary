@@ -1,8 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const { pool } = require("./db"); // ✅ CommonJS import for your Postgres pool
-const authRoutes = require("./routes/auth"); // ✅ CommonJS import for routes
+const { pool } = require("./db"); 
+const authRoutes = require("./routes/auth"); 
 
 dotenv.config();
 
@@ -39,6 +39,10 @@ app.get("/", (req, res) => {
   res.send("Audiary API running");
 });
 
+// // ===== START SERVER =====
+// const PORT = process.env.PORT || 3000;
+// app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
 // ===== START SERVER =====
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
+app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on ${PORT}`));
+
