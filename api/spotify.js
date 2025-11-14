@@ -1,10 +1,22 @@
 // api/spotify.js
 import { encode as btoa } from "base-64";
 
+/* ============================================================
+   TOKEN CACHE (CRITICAL SPEED BOOST)
+   ============================================================ */
 const CLIENT_ID = "c7d7aa47c5554dff888bf92c0a16928e";
 const CLIENT_SECRET = "1b7386a050114a7eaf57b6569e386d12";
 
+let _token = null;
+let _tokenExpiresAt = 0;
+
 async function getSpotifyToken() {
+  const now = Date.now();
+
+  // If token exists and not expired → reuse
+  if (_token && now < _tokenExpiresAt) return _token;
+
+  // Otherwise fetch new token
   const creds = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
   const res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
@@ -14,54 +26,211 @@ async function getSpotifyToken() {
     },
     body: "grant_type=client_credentials",
   });
+
   const data = await res.json();
-  return data.access_token;
+
+  if (!res.ok) {
+    console.error("Spotify token error:", data);
+    throw new Error("Failed to fetch Spotify token");
+  }
+
+  _token = data.access_token;
+  _tokenExpiresAt = now + data.expires_in * 1000 - 5000;
+
+  return _token;
 }
 
-// Pick the best available image (prefer largest first, then fallbacks)
+/* ============================================================
+   UTILITIES (FAST)
+   ============================================================ */
+
 const pickImage = (images) =>
-  images?.[0]?.url || images?.[1]?.url || images?.[2]?.url || null;
+  images && images.length ? images[0].url || null : null;
 
-// Deduplicate by a key, keep the most popular item
+// optimized dedupe + sort
 function deduplicateAndSort(items, keyFn) {
-  const map = {};
-  items.forEach((item) => {
-    const key = keyFn(item);
-    if (!map[key] || (item.popularity ?? 0) > (map[key].popularity ?? 0)) {
-      map[key] = item;
+  const out = Object.create(null);
+
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const key = keyFn(it);
+    const exist = out[key];
+    if (!exist || (it.popularity ?? 0) > (exist.popularity ?? 0)) {
+      out[key] = it;
     }
-  });
-  return Object.values(map).sort(
-    (a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)
-  );
+  }
+
+  const arr = Object.values(out);
+  arr.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+  return arr;
 }
 
-// ===== Albums =====
+/* ============================================================
+   BILLBOARD HOT 100 PLAYLIST (CRITICAL SPEED BOOST)
+   One fetch → shared between Albums + Tracks
+   3-minute cache → no lag switching tabs
+   ============================================================ */
+
+let _billboardCache = null;
+let _billboardCacheTime = 0;
+
+async function fetchBillboardPlaylist() {
+  const now = Date.now();
+
+  // Cache for 3 minutes
+  if (_billboardCache && now - _billboardCacheTime < 180000) {
+    return _billboardCache;
+  }
+
+  const token = await getSpotifyToken();
+  const playlistId = "6UeSakyzhiEt4NB3UAd6NQ"; // Billboard Hot 100
+  let url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
+
+  const headers = { Authorization: `Bearer ${token}` };
+  const tracks = [];
+
+  while (url) {
+    const res = await fetch(url, { headers });
+    const data = await res.json();
+    const items = data.items || [];
+    tracks.push(...items);
+    url = data.next;
+  }
+
+  _billboardCache = tracks;
+  _billboardCacheTime = now;
+  return tracks;
+}
+
+/* ============================================================
+   POPULAR ALBUMS — uses Billboard cache
+   ============================================================ */
+export async function getTopAlbumsSpotify(limit = 39) {
+  if (!limit || limit <= 0) limit = 39;
+
+  try {
+    const allItems = await fetchBillboardPlaylist();
+
+    const out = [];
+    const seen = new Set();
+    let rank = 1;
+
+    for (let i = 0; i < allItems.length && out.length < limit; i++) {
+      const track = allItems[i]?.track;
+      const album = track?.album;
+
+      if (!track || !album || !album.id) continue;
+      if (seen.has(album.id)) continue;
+
+      seen.add(album.id);
+
+      const artists =
+        (track.artists || album.artists || [])
+          .map((a) => a?.name)
+          .filter(Boolean)
+          .join(", ") || "Unknown Artist";
+
+      out.push({
+        id: album.id,
+        rank: rank++,
+        title: album.name || "",
+        artist: artists,
+        type: album.album_type,
+        coverUrl: pickImage(album.images),
+        popularity: track.popularity ?? 0,
+        releaseDate: album.release_date || null,
+        trackCount: album.total_tracks ?? null,
+        spotifyUrl:
+          track.external_urls?.spotify || album.external_urls?.spotify || null,
+      });
+    }
+
+    return { albums: out };
+  } catch (err) {
+    console.error("Spotify top albums error:", err);
+    return { albums: [] };
+  }
+}
+
+/* ============================================================
+   POPULAR TRACKS — uses Billboard cache
+   ============================================================ */
+export async function getTopTracksSpotify(limit = 39) {
+  if (!limit || limit <= 0) limit = 39;
+
+  try {
+    const allItems = await fetchBillboardPlaylist();
+
+    const out = [];
+    const seen = new Set();
+    let rank = 1;
+
+    for (let i = 0; i < allItems.length && out.length < limit; i++) {
+      const track = allItems[i]?.track;
+      if (!track || !track.id) continue;
+      if (seen.has(track.id)) continue;
+
+      seen.add(track.id);
+
+      const album = track.album;
+      const artists =
+        track.artists?.map((a) => a?.name).filter(Boolean).join(", ") ||
+        "Unknown Artist";
+
+      out.push({
+        id: track.id,
+        rank: rank++,
+        title: track.name,
+        artist: artists,
+        album: album?.name || "",
+        coverUrl: pickImage(album?.images),
+        popularity: track.popularity ?? 0,
+        releaseDate: album?.release_date || null,
+        spotifyUrl: track.external_urls?.spotify || null,
+      });
+    }
+
+    return { tracks: out };
+  } catch (err) {
+    console.error("Spotify top tracks error:", err);
+    return { tracks: [] };
+  }
+}
+
+/* ============================================================
+   ALBUM SEARCH
+   ============================================================ */
 export async function searchAlbumsSpotify(query) {
   if (!query) return { albums: [] };
+
   try {
     const token = await getSpotifyToken();
     const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(
       query
     )}&type=album&limit=50`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    const data = await res.json();
-    const albums = data.albums?.items || [];
 
-    const mapped = albums.map((album) => {
-      const artist = album.artists?.map((a) => a.name).join(", ") || "Unknown Artist";
-      return {
-        id: album.id,
-        title: (album.name || "").trim(),
-        artist,
-        type: album.album_type, // album | single | compilation
-        coverUrl: pickImage(album.images),
-        popularity: album.popularity ?? 0, // often absent in /search; keep 0
-        releaseDate: album.release_date || null,
-        trackCount: album.total_tracks ?? null,
-        spotifyUrl: album.external_urls?.spotify || null,
-      };
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
     });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("Spotify album search error:", data);
+      return { albums: [] };
+    }
+
+    const items = data.albums?.items || [];
+    const mapped = items.map((album) => ({
+      id: album.id,
+      title: album.name || "",
+      artist: album.artists?.map((a) => a.name).join(", ") || "Unknown Artist",
+      type: album.album_type,
+      coverUrl: pickImage(album.images),
+      popularity: album.popularity ?? 0,
+      releaseDate: album.release_date || null,
+      trackCount: album.total_tracks ?? null,
+      spotifyUrl: album.external_urls?.spotify || null,
+    }));
 
     return {
       albums: deduplicateAndSort(
@@ -75,29 +244,40 @@ export async function searchAlbumsSpotify(query) {
   }
 }
 
-// ===== Tracks =====
+/* ============================================================
+   TRACK SEARCH
+   ============================================================ */
 export async function searchTracksSpotify(query) {
   if (!query) return { tracks: [] };
+
   try {
     const token = await getSpotifyToken();
     const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(
       query
     )}&type=track&limit=50`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    const data = await res.json();
-    const tracks = data.tracks?.items || [];
 
-    const mapped = tracks.map((track) => {
-      const artist = track.artists?.map((a) => a.name).join(", ") || "Unknown Artist";
-      const album = track.album || {};
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("Spotify track search error:", data);
+      return { tracks: [] };
+    }
+
+    const items = data.tracks?.items || [];
+    const mapped = items.map((track) => {
+      const album = track.album;
       return {
         id: track.id,
         name: track.name,
-        artist,
+        artist:
+          track.artists?.map((a) => a.name).join(", ") || "Unknown Artist",
         popularity: track.popularity ?? 0,
-        album: album.name || "",
-        coverUrl: pickImage(album.images),
-        releaseDate: album.release_date || null,
+        album: album?.name || "",
+        coverUrl: pickImage(album?.images),
+        releaseDate: album?.release_date || null,
         trackNumber: track.track_number ?? null,
         discNumber: track.disc_number ?? null,
         spotifyUrl: track.external_urls?.spotify || null,
@@ -116,79 +296,83 @@ export async function searchTracksSpotify(query) {
   }
 }
 
-// ===== Artists =====
+/* ============================================================
+   ARTIST SEARCH
+   ============================================================ */
 export async function searchArtistsSpotify(query) {
   if (!query) return { artists: [] };
+
   try {
     const token = await getSpotifyToken();
     const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(
       query
     )}&type=artist&limit=50`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    const data = await res.json();
-    const artists = data.artists?.items || [];
 
-    const mapped = artists.map((artist) => ({
-      id: artist.id,
-      name: artist.name,
-      popularity: artist.popularity ?? 0,
-      imageUrl: pickImage(artist.images),
-      genres: artist.genres || [],
-      spotifyUrl: artist.external_urls?.spotify || null,
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("Spotify artists search error:", data);
+      return { artists: [] };
+    }
+
+    const items = data.artists?.items || [];
+    const mapped = items.map((a) => ({
+      id: a.id,
+      name: a.name,
+      popularity: a.popularity ?? 0,
+      imageUrl: pickImage(a.images),
+      genres: a.genres || [],
+      spotifyUrl: a.external_urls?.spotify || null,
     }));
 
-    return { artists: deduplicateAndSort(mapped, (a) => a.name.toLowerCase()) };
+    return {
+      artists: deduplicateAndSort(mapped, (x) => x.name.toLowerCase()),
+    };
   } catch (err) {
     console.error("Spotify artists search error:", err);
     return { artists: [] };
   }
 }
 
-// ===== Album Tracks (normalized) =====
+/* ============================================================
+   ALBUM TRACKS
+   ============================================================ */
 export async function getAlbumTracksSpotify(albumId) {
   if (!albumId) return { tracks: [] };
+
   try {
     const token = await getSpotifyToken();
-
-    // Fetch all tracks (handles pagination if album has >50 tracks)
     let url = `https://api.spotify.com/v1/albums/${albumId}/tracks?limit=50`;
+
+    const headers = { Authorization: `Bearer ${token}` };
     const all = [];
 
-    // Spotify pagination via `next` url
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    while (url) {
+      const res = await fetch(url, { headers });
       const data = await res.json();
       const items = data.items || [];
       all.push(...items);
-      if (!data.next) break;
       url = data.next;
     }
 
-    // Normalize to the shape your UI expects
-    const normalized = all.map((t, idx) => {
-      const artists =
-        Array.isArray(t?.artists) ? t.artists.map((a) => a?.name).filter(Boolean) : [];
-      return {
-        id: t?.id ?? `${albumId}-${idx + 1}`,
-        name: t?.name ?? `Track ${idx + 1}`,
-        track_number:
-          t?.track_number ??
-          t?.trackNumber ??
-          (typeof t?.trackNo === "number" ? t.trackNo : idx + 1),
-        artists,
-        spotifyUrl:
-          t?.external_urls?.spotify ||
-          (t?.id ? `https://open.spotify.com/track/${t.id}` : null),
-      };
-    });
+    const out = all.map((t, idx) => ({
+      id: t.id ?? `${albumId}-${idx + 1}`,
+      name: t.name || `Track ${idx + 1}`,
+      track_number: t.track_number ?? idx + 1,
+      artists: t.artists?.map((a) => a?.name).filter(Boolean) || [],
+      spotifyUrl:
+        t.external_urls?.spotify ||
+        (t.id ? `https://open.spotify.com/track/${t.id}` : null),
+    }));
 
-    // Sort just in case
-    normalized.sort(
+    out.sort(
       (a, b) => (a.track_number ?? 0) - (b.track_number ?? 0)
     );
 
-    return { tracks: normalized };
+    return { tracks: out };
   } catch (err) {
     console.error("Spotify album tracks fetch error:", err);
     return { tracks: [] };
