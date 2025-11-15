@@ -10,6 +10,9 @@ import {
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 
+console.log("📥 Loading AuthGate component...");
+
+
 // Unified token getter
 async function getStoredToken() {
   if (Platform.OS === "web") {
