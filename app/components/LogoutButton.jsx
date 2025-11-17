@@ -10,6 +10,7 @@ export default function LogoutButton() {
   async function onLogout() {
     await setAuthToken(null); // clear token
     router.replace("/(auth)/LoginScreen"); // go to login
+    console.log("User logged out.",);
   }
 
   return (

@@ -29,6 +29,7 @@ export default function AuthGate({ children }) {
   const checkToken = useCallback(async () => {
     try {
       const token = await getStoredToken();
+      console.log("🔑 Retrieved token from getStoredToken:", token);
       return !!token; // true = logged in, false = guest
     } catch {
       return false;
