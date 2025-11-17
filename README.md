@@ -58,8 +58,6 @@ Copy this URL.
 
 Inside the main project root:
 
-Audiary/.env
-=======
 `Audiary/.env`
 
 Put:
