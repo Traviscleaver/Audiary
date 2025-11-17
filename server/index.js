@@ -1,9 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const { pool } = require("./db");
 const authRoutes = require("./routes/auth");
-const userRoutes = require("./routes/user");   // ✅ ADDED
+const userRoutes = require("./routes/user"); 
+const { pool } = require("./db"); 
 
 dotenv.config();
 
@@ -16,7 +16,7 @@ console.log("Starting Audiary API server...");
 
 // ===== ROUTES =====
 app.use("/auth", authRoutes);
-app.use("/", userRoutes);                      // ✅ ADDED EXACTLY HERE
+app.use("/", userRoutes);                      
 
 // ===== DB TEST ROUTE =====
 app.get("/db-test", async (req, res) => {
@@ -42,3 +42,4 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => console.log(`Server listening on ${PORT}`));
+
