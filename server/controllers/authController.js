@@ -36,6 +36,7 @@ async function createUserWithPassword(email, username, password) {
 exports.register = async (req, res) => {
   try {
     const { email, username, password } = req.body || {};
+    console.log("Register attempt:", email, username);
     if (!email || !username || !password) {
       return res
         .status(400)
@@ -62,8 +63,10 @@ exports.register = async (req, res) => {
 };
 
 exports.login = async (req, res) => {
+
   try {
     const { email, password } = req.body || {};
+    console.log("Login attempt:", email);
     if (!email || !password)
       return res.status(400).json({ error: "email and password required" });
 

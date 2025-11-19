@@ -1,19 +1,22 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { api, setToken } from "../../lib/AuthClient";
+// import { api, setToken } from "../../lib/AuthClient";
+import { api } from "../../lib/api.js";
+import { useAuth } from "../../lib/AuthContext.js";
 
 export default function RegisterScreen() {
+  const { setAuthToken } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -27,26 +30,24 @@ export default function RegisterScreen() {
       setErrorMsg("");
       setLoading(true);
 
-      const res = await api("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ email, username, password })
-      });
+      // api() returns parsed JSON directly
+      const data = await api(
+        "/auth/register",
+        "POST",
+        { email, username, password }
+      );
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setErrorMsg(data.error || "Could not register.");
-        return;
-      }
-
-      await setToken(data.token);
+      await setAuthToken(data.token);
       router.replace("/home");
+
     } catch (err) {
-      setErrorMsg("Network error.");
+      console.log("🔥 Register error:", err);
+      setErrorMsg(err?.error || "Could not register.");
     } finally {
       setLoading(false);
     }
   }
+
 
   return (
     <SafeAreaView style={styles.safe}>
