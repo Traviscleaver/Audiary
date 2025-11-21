@@ -4,3 +4,4 @@ npm i express
 npm i helmet
 npm install pg
 npx expo install expo-constants
+npm i --save-dev jest supertest

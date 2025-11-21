@@ -8,12 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from "../../lib/imports";
-// import onLogout from "../LogoutButton";
 import { useRouter } from "expo-router";
 import { updateProfile } from "../../../lib/api";
 import { useAuth } from "../../../lib/AuthContext.js";
 import { logout } from "../../../lib/logout";
-
 
 export default function SettingsOverlay({
   settingsAnim,
@@ -35,46 +33,57 @@ export default function SettingsOverlay({
   openBioOverlay,
   pronoun,
 
+  // Avatar is passed from Profile.jsx (even if we don't edit it here yet)
+  avatarUrl,
+  setAvatarUrl,
+
   // Parent callback
   onSave,
 }) {
-
   const router = useRouter();
   const { setAuthToken } = useAuth();
 
   const handleSave = async () => {
     try {
-      const displayName =
-        (givenName?.trim() || "") + " " + (familyName?.trim() || "");
+      const trimmedHandle = handle?.trim() || null;
+      const trimmedEmail = email?.trim() || null;
+      const trimmedGiven = givenName?.trim() || "";
+      const trimmedFamily = familyName?.trim() || "";
+      const displayName = (trimmedGiven + " " + trimmedFamily).trim() || null;
 
-      // Build payload for your backend
       const payload = {
-        username: handle,
-        email: email,
-        display_name: displayName.trim() || null,
-        bio: null, // handled by BioOverlay
+        // USERS table
+        username: trimmedHandle,
+        email: trimmedEmail,
+        display_name: displayName,
+        avatar_url: avatarUrl || null,
+
+        // USER_PROFILES table
+        first_name: trimmedGiven || null,
+        last_name: trimmedFamily || null,
+        location: (location || "").trim() || null,
+        website: (website || "").trim() || null,
+
+        // bio handled in BioOverlay, so leave this alone here
+        // bio: null,
       };
 
       const res = await updateProfile(payload);
 
-      // Let Profile.jsx update its UI instantly
-      if (onSave) onSave(res.user);
+      if (onSave && res?.user) {
+        onSave(res.user);
+      }
 
       closeSettings();
     } catch (err) {
       console.error("Profile update error:", err);
-      alert(err.message || "Failed to update profile");
+      const msg =
+        err?.error ||
+        err?.message ||
+        "Failed to update profile. Please try again.";
+      alert(msg);
     }
   };
-
-  // async function onLogout() {
-  //   try {
-  //     // await setAuthToken(null); // Clear token
-  //     router.replace("/(auth)/LoginScreen"); // Navigate to login
-  //   } catch (err) {
-  //     console.log("Logout error:", err);
-  //   }
-  // }
 
   return (
     <Animated.View style={[styles.settingsOverlay, { opacity: settingsAnim }]}>
@@ -116,7 +125,6 @@ export default function SettingsOverlay({
         </View>
 
         <ScrollView>
-
           {/* ACCOUNT */}
           <Text style={styles.smallHeader}>ACCOUNT</Text>
 
@@ -147,12 +155,6 @@ export default function SettingsOverlay({
             </Text>
           </TouchableOpacity>
 
-          {/* <TouchableOpacity style={styles.rowTouchable} onPress={onLogout}>
-            <Text style={[styles.editLabel, { color: COLORS.danger }]}>
-              Sign out
-            </Text>
-          </TouchableOpacity> */}
-
           {/* PROFILE */}
           <Text style={styles.smallHeader}>PROFILE</Text>
 
@@ -181,12 +183,15 @@ export default function SettingsOverlay({
           </View>
 
           {/* EMAIL */}
-          <TouchableOpacity style={styles.rowTouchable} onPress={openEmailOverlay}>
+          <TouchableOpacity
+            style={styles.rowTouchable}
+            onPress={openEmailOverlay}
+          >
             <Text style={styles.editLabel}>Email address</Text>
             <Text style={styles.editValue}>{email}</Text>
           </TouchableOpacity>
 
-          {/* LOCATION (not implemented in backend) */}
+          {/* LOCATION */}
           <View style={styles.rowEditable}>
             <Text style={styles.editLabel}>Location</Text>
             <TextInput
@@ -198,7 +203,7 @@ export default function SettingsOverlay({
             />
           </View>
 
-          {/* WEBSITE (not implemented in backend) */}
+          {/* WEBSITE */}
           <View style={styles.rowEditable}>
             <Text style={styles.editLabel}>Website</Text>
             <TextInput
@@ -211,11 +216,14 @@ export default function SettingsOverlay({
           </View>
 
           {/* BIO */}
-          <TouchableOpacity style={styles.rowTouchable} onPress={openBioOverlay}>
+          <TouchableOpacity
+            style={styles.rowTouchable}
+            onPress={openBioOverlay}
+          >
             <Text style={styles.editLabel}>Bio</Text>
           </TouchableOpacity>
 
-          {/* PRONOUN (not implemented in backend) */}
+          {/* PRONOUN (frontend-only for now) */}
           <TouchableOpacity style={styles.rowTouchable}>
             <Text style={styles.editLabel}>Pronoun</Text>
             <Text style={styles.editValue}>{pronoun}</Text>
@@ -233,7 +241,10 @@ export default function SettingsOverlay({
 const styles = StyleSheet.create({
   settingsOverlay: {
     position: "absolute",
-    top: 0, left: 0, right: 0, bottom: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
     zIndex: 3000,
@@ -241,7 +252,10 @@ const styles = StyleSheet.create({
 
   overlayBackground: {
     position: "absolute",
-    top: 0, left: 0, right: 0, bottom: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 
   settingsSheet: {
