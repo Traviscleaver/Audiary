@@ -1,51 +1,74 @@
-# Welcome to your Expo app 👋
-
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
-
-## Get started
+# Welcome to your GEEK LAND👋
 
 1. Install dependencies
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+cd Audiary/server
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Create the server/.env file
 
-## Learn more
+Inside Audiary/server/, create a file called:
 
-To learn more about developing your project with Expo, look at the following resources:
+server/.env
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Put this inside it:
 
-## Join the community
+```
+DATABASE_URL=your-supabase-url
+JWT_SECRET=any-random-string
+PORT=3000
+```
 
-Join our community of developers creating universal apps.
+3. Start the Express server
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-"# Audiary" 
+```sh
+npm run dev
+```
+
+You MUST see:
+
+Starting Audiary API server...
+Server listening on 3000
+
+4. Install Cloudflare Tunnel (Admin PowerShell)
+
+```sh
+winget install Cloudflare.Cloudflared
+```
+
+Restart terminal (not your PC — just the terminal).
+
+5. Run Cloudflare Tunnel (Normal PowerShell)
+
+```sh
+cloudflared tunnel --protocol http2 --url http://localhost:3000
+
+```
+
+You will see:
+
+Your quick Tunnel has been created!
+https://something.trycloudflare.com
+
+Copy this URL.
+
+6. Put the API URL into the client .env file
+
+Inside the main project root:
+
+`Audiary/.env`
+
+Put:
+
+```
+API_URL=https://something.trycloudflare.com
+
+```
+
+7. Hard reset Expo
+
+```sh
+npx expo start -c
+```

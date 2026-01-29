@@ -378,3 +378,72 @@ export async function getAlbumTracksSpotify(albumId) {
     return { tracks: [] };
   }
 }
+
+
+
+
+
+
+/* ============================================================
+   LOOKUP BY ID FOR FAVORITES
+   ============================================================ */
+
+export async function getAlbumByIdSpotify(id) {
+  if (!id) return null;
+  const token = await getSpotifyToken();
+
+  const res = await fetch(`https://api.spotify.com/v1/albums/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const album = await res.json();
+  if (!res.ok) return null;
+
+  return {
+    id: album.id,
+    title: album.name,
+    artist: album.artists?.map(a => a.name).join(", ") || "",
+    coverUrl: album.images?.[0]?.url || null,
+    trackCount: album.total_tracks,
+    releaseDate: album.release_date,
+  };
+}
+
+export async function getSongByIdSpotify(id) {
+  if (!id) return null;
+  const token = await getSpotifyToken();
+
+  const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const track = await res.json();
+  if (!res.ok) return null;
+
+  return {
+    id: track.id,
+    title: track.name,
+    artist: track.artists?.map(a => a.name).join(", ") || "",
+    coverUrl: track.album?.images?.[0]?.url || null,
+    album: track.album?.name || "",
+  };
+}
+
+export async function getArtistByIdSpotify(id) {
+  if (!id) return null;
+  const token = await getSpotifyToken();
+
+  const res = await fetch(`https://api.spotify.com/v1/artists/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const artist = await res.json();
+  if (!res.ok) return null;
+
+  return {
+    id: artist.id,
+    name: artist.name,
+    imageUrl: artist.images?.[0]?.url || null,
+    genres: artist.genres || [],
+  };
+}

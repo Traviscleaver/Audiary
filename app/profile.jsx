@@ -1,48 +1,40 @@
-// screens/profile.jsx
-import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, {
-  memo,
-  useMemo,
-  useRef,
-  useState
-} from "react";
+// profile.jsx
+// profile.jsx
+import * as SecureStore from "expo-secure-store";
+import { useAuth } from "../lib/AuthContext.js";
 import {
   Animated,
+  COLORS,
+  Feather,
   FlatList,
+  Image,
+  SIZES,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
-  View
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+  View,
+  memo,
+  useEffect,
+  useRef,
+  useRouter,
+  useSafeAreaInsets,
+  useState
+} from "./shared/imports.js";
 
-/* ===== Theme ===== */
-const COLORS = {
-  screen: "#121212",
-  card: "#191919",
-  text: "#ffffff",
-  subtext: "#bfc6cf",
-  divider: "#232323",
-  active: "#1db954",
-  danger: "#ff5757",
-  faint: "#ffffff60",
-};
+import FavoriteItemCard from "./components/FavoriteItemCard.jsx";
+import BioOverlay from "./components/profile/BioOverlay.jsx";
+import EmailOverlay from "./components/profile/EmailOverlay.jsx";
+import SettingsOverlay from "./components/profile/SettingsOverlay.jsx";
+import FooterBar from "./shared/components/FooterBar.jsx";
 
-const SIZES = {
-  pad: 16,
-  radius: 12,
-  avatar: 72,
-  footerHeight: 58,
+import {
+  api,
+  getMyProfile,
+  getMyStats
+} from "../lib/api";
 
-  cover: 104,
-  coverRadius: 12,
-  cardGap: 12,
-  cardWidth: 104,
-};
 
 const TABS = ["Home", "Reviews", "Lists"];
 const AVATAR_SCALE = 1.5;
@@ -51,30 +43,125 @@ export default function Profile() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [handle, setHandle] = useState("user123");
-  const [givenName, setGivenName] = useState("Travis");
-  const [familyName, setFamilyName] = useState("Cleaver");
-  const [email, setEmail] = useState("travis@example.com");
-  const [location, setLocation] = useState("Vancouver BC");
+  const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  // ===== USER STATE =====
+  const [handle, setHandle] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [location, setLocation] = useState("");
   const [website, setWebsite] = useState("");
   const [pronoun, setPronoun] = useState("He / his");
+
+  // Profile data sets
+  const [favourites, setFavourites] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [ratings, setRatings] = useState([]); // not used yet
+  const [diary, setDiary] = useState([]);     // LISTS
+  const [activity, setActivity] = useState([]);
+
+
+  // For your Settings UI
+  const [givenName, setGivenName] = useState("");
+  const [familyName, setFamilyName] = useState("");
+
   const [activeTab, setActiveTab] = useState("Home");
 
-  const stats = useMemo(
-    () => ({
-      reviews: 2,
-      followers: 2,
-      ratings: 22,
-    }),
-    []
-  );
+  // Filtered favorites
+  const favouriteAlbums = favourites.filter(f => f.item_type === "album");
+  const favouriteSongs = favourites.filter(f => f.item_type === "song");
+  const favouriteArtists = favourites.filter(f => f.item_type === "artist");
 
-  /* ========== SETTINGS OVERLAY ========== */
+  const { status } = useAuth();
+
+
+  useEffect(() => {
+    if (status === "guest") {
+      router.replace("/(auth)/LoginScreen");
+    }
+  }, [status]);
+
+
+  useEffect(() => {
+    console.log("🟡 Loading profile & all user data");
+
+    async function load() {
+      try {
+        const prof = await getMyProfile();
+        console.log("🔍 TOKEN FROM SECURESTORE:", await SecureStore.getItemAsync("auth_token"));
+        const user = prof.user;
+        setProfile(user);
+
+        // All secondary data
+        const [
+          statsRes,
+          favRes,
+          reviewsRes,
+          ratingsRes,
+          playlistsRes,
+          diaryRes,
+          activityRes
+        ] = await Promise.all([
+          getMyStats(user.username),
+          api(`/users/${user.username}/favorites`),
+          api(`/users/${user.username}/reviews`),
+          api(`/users/${user.username}/ratings`),
+          api(`/users/${user.username}/playlists`),
+          api(`/users/${user.username}/diary`),
+          api(`/users/${user.username}/activity`)
+        ]);
+
+        setStats(statsRes.stats || {});
+        setFavourites(favRes.favorites || []);
+        setReviews(reviewsRes.reviews || []);
+        setRatings(ratingsRes.ratings || []);
+        setPlaylists(playlistsRes.playlists || []);
+        setDiary(diaryRes.diary || []);
+        setActivity(activityRes.activity || []);
+      } catch (err) {
+        console.log("🔥 PROFILE LOAD ERROR:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+ 
+
+    load();
+  }, []);
+
+
+
+
+  // ===== HYDRATE UI FROM PROFILE =====
+  useEffect(() => {
+    if (!profile) return;
+
+    setHandle(profile.username || "");
+    setEmail(profile.email || "");
+    setDisplayName(profile.display_name || "");
+    setBio(profile.bio || "");
+    setAvatarUrl(profile.avatar_url || "");
+
+    // Split name for settings UI
+    if (profile.display_name) {
+      const parts = profile.display_name.split(" ");
+      setGivenName(parts[0] || "");
+      setFamilyName(parts[1] || "");
+    }
+  }, [profile]);
+
+  /* ========== SETTINGS OVERLAY STATE ========== */
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bioOverlayOpen, setBioOverlayOpen] = useState(false);
   const [emailOverlayOpen, setEmailOverlayOpen] = useState(false);
 
   const settingsAnim = useRef(new Animated.Value(0)).current;
+  const subAnim = useRef(new Animated.Value(0)).current;
 
   const openSettings = () => {
     setSettingsOpen(true);
@@ -92,9 +179,6 @@ export default function Profile() {
       useNativeDriver: true,
     }).start(() => setSettingsOpen(false));
   };
-
-  /* ========== SUB OVERLAYS ========== */
-  const subAnim = useRef(new Animated.Value(0)).current;
 
   const openBioOverlay = () => {
     setBioOverlayOpen(true);
@@ -132,10 +216,10 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={[styles.safe, { paddingTop: 0 }]}>
-      {/* === MAIN PROFILE (UNCHANGED) === */}
-      <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
 
-        <View style={[styles.topRightActions, { top: insets.top + 4}]}>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
+        <View style={[styles.topRightActions, { top: insets.top + 4 }]}>
+
           <TouchableOpacity style={styles.iconBtn}>
             <Feather name="share-2" size={20} color={COLORS.text} />
           </TouchableOpacity>
@@ -145,22 +229,36 @@ export default function Profile() {
           </TouchableOpacity>
         </View>
 
+        {/* HEADER */}
         <View style={styles.headerWrap}>
           <View style={styles.headerRow}>
             <View style={styles.leftCol}>
               <View style={styles.avatar}>
-                <Feather name="user" size={48} color={COLORS.subtext} />
+                {avatarUrl ? (
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      borderRadius: 999,
+                    }}
+                  />
+                ) : (
+                  <Feather name="user" size={48} color={COLORS.subtext} />
+                )}
               </View>
             </View>
 
             <View style={styles.rightCol}>
               <View style={styles.centeredRightBlock}>
-                <Text style={styles.nameBig}>{handle}</Text>
+                <Text style={styles.nameBig}>
+                  {displayName || handle || "User"}
+                </Text>
 
                 <View style={styles.inlineRow}>
-                  <InlineStat count={stats.followers} label="followers" />
-                  <InlineStat count={stats.reviews} label="reviews" />
-                  <InlineStat count={stats.ratings} label="ratings" />
+                  <InlineStat count={stats.total_reviews || 0} label="reviews" />
+                  <InlineStat count={stats.total_ratings || 0} label="ratings" />
+                  <InlineStat count={stats.total_songs_listened || 0} label="listens" />
                 </View>
               </View>
             </View>
@@ -174,8 +272,8 @@ export default function Profile() {
           ))}
         </View>
 
-        {/* CONTENT */}
-        {activeTab === "Home" && (
+        {/* TAB CONTENT */}
+        {/* {activeTab === "Home" && (
           <>
             <Section title="Favourite Albums">
               <PlaceholderSlider type="album" count={10} />
@@ -190,296 +288,196 @@ export default function Profile() {
               <PlaceholderSlider type="activity" count={14} />
             </Section>
           </>
+        )} */}
+        {activeTab === "Home" && (
+          <>
+            {/* FAVORITE ALBUMS */}
+            <Section title="Favourite Albums">
+              <FlatList
+                horizontal
+                data={favouriteAlbums}
+                keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                renderItem={({ item }) => (
+                  <FavoriteItemCard type="album" id={item.item_id} />
+                )}
+                contentContainerStyle={styles.sliderContent}
+                showsHorizontalScrollIndicator={false}
+              />
+            </Section>
+
+            {/* FAVORITE SONGS */}
+            <Section title="Favourite Songs">
+              <FlatList
+                horizontal
+                data={favouriteSongs}
+                keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                renderItem={({ item }) => (
+                  <FavoriteItemCard type="song" id={item.item_id} />
+                )}
+                contentContainerStyle={styles.sliderContent}
+                showsHorizontalScrollIndicator={false}
+              />
+            </Section>
+
+            {/* FAVORITE ARTISTS */}
+            <Section title="Favourite Artists">
+              <FlatList
+                horizontal
+                data={favouriteArtists}
+                keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                renderItem={({ item }) => (
+                  <FavoriteItemCard type="artist" id={item.item_id} />
+                )}
+                contentContainerStyle={styles.sliderContent}
+                showsHorizontalScrollIndicator={false}
+              />
+            </Section>
+
+            {/* RECENT ACTIVITY */}
+            <Section title="Recent Activity" bottomMargin>
+              {activity.length === 0 ? (
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.placeholderText}>No activity yet.</Text>
+                </View>
+              ) : (
+                activity.map((a) => (
+                  <View key={a.activity_id} style={{ padding: 12 }}>
+                    <Text style={{ color: COLORS.text }}>
+                      {a.type} → {a.description}
+                    </Text>
+                    <Text style={{ color: COLORS.subtext, fontSize: 12 }}>
+                      {new Date(a.created_at).toLocaleString()}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </Section>
+          </>
         )}
 
-        {activeTab === "Reviews" && (
+
+        {/* {activeTab === "Reviews" && (
           <Section title="Reviews">
             <View style={styles.emptyWrap}>
               <Text style={styles.placeholderText}>No reviews yet.</Text>
             </View>
           </Section>
+        )} */}
+        {activeTab === "Reviews" && (
+          <Section title="Reviews">
+            {reviews.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.placeholderText}>No reviews yet.</Text>
+              </View>
+            ) : (
+              reviews.map((r) => (
+                <View key={r.review_id} style={{ padding: 12 }}>
+                  <Text style={{ color: COLORS.text, fontWeight: "700" }}>
+                    {r.song_title}
+                  </Text>
+                  <Text style={{ color: COLORS.active, marginTop: 4 }}>
+                    ★ {r.rating}
+                  </Text>
+                  <Text style={{ color: COLORS.text, marginTop: 6 }}>
+                    {r.content}
+                  </Text>
+                </View>
+              ))
+            )}
+          </Section>
         )}
 
-        {activeTab === "Lists" && (
+
+        {/* {activeTab === "Lists" && (
           <Section title="Lists">
             <View style={styles.emptyWrap}>
               <Text style={styles.placeholderText}>No lists yet.</Text>
             </View>
           </Section>
+        )} */}
+        {activeTab === "Lists" && (
+          <Section title="Lists">
+            {playlists.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.placeholderText}>No playlists yet.</Text>
+              </View>
+            ) : (
+              playlists.map((p) => (
+                <View key={p.playlist_id} style={{ padding: 14 }}>
+                  <Text style={{ color: COLORS.text, fontSize: 18, fontWeight: "800" }}>
+                    {p.title}
+                  </Text>
+                  <Text style={{ color: COLORS.subtext }}>
+                    {p.song_count} songs
+                  </Text>
+                </View>
+              ))
+            )}
+          </Section>
         )}
+
       </ScrollView>
 
       <FooterBar router={router} insets={insets} />
 
-      {/* ======================================================
-                       SETTINGS OVERLAY
-         ====================================================== */}
+      {/* ======= SETTINGS OVERLAY ======= */}
       {settingsOpen && (
-        <Animated.View style={[styles.settingsOverlay, { opacity: settingsAnim }]}>
-          <TouchableOpacity
-            onPress={closeSettings}
-            style={styles.overlayBackground}
-            activeOpacity={1}
-          />
+        <SettingsOverlay
+          settingsAnim={settingsAnim}
+          closeSettings={closeSettings}
 
-          <Animated.View
-            style={[
-              styles.settingsSheet,
-              {
-                /* UPDATED: Overlay now 92% height */
-                height: "92%",
-                transform: [
-                  {
-                    translateY: settingsAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [700, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            {/* HEADER */}
-            <View style={styles.sheetHeader}>
-              <TouchableOpacity onPress={closeSettings}>
-                <Text style={styles.sheetCancel}>Cancel</Text>
-              </TouchableOpacity>
+          handle={handle}
+          setHandle={setHandle}
 
-              <Text style={styles.sheetTitle}>Settings</Text>
+          givenName={givenName}
+          setGivenName={setGivenName}
+          familyName={familyName}
+          setFamilyName={setFamilyName}
 
-              <TouchableOpacity onPress={closeSettings}>
-                <Text style={styles.sheetSave}>Save</Text>
-              </TouchableOpacity>
-            </View>
+          email={email}
 
-            <ScrollView>
+          location={location}
+          setLocation={setLocation}
+          website={website}
+          setWebsite={setWebsite}
+          pronoun={pronoun}
 
-              {/* ACCOUNT */}
-              <Text style={styles.smallHeader}>ACCOUNT</Text>
+          openBioOverlay={openBioOverlay}
+          openEmailOverlay={openEmailOverlay}
 
-              {/* USERNAME */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Username</Text>
-                <TextInput
-                  value={handle}
-                  onChangeText={setHandle}
-                  placeholder="Username"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                  maxLength={36}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                />
-              </View>
+          avatarUrl={avatarUrl}
+          setAvatarUrl={setAvatarUrl}
 
-              {/* PASSWORD & AUTH */}
-              <TouchableOpacity style={styles.rowTouchable}>
-                <Text style={styles.editLabel}>Password and authentication</Text>
-                <Feather name="chevron-right" size={18} color={COLORS.subtext} />
-              </TouchableOpacity>
-
-              {/* SIGN OUT */}
-              <TouchableOpacity style={styles.rowTouchable}>
-                <Text style={[styles.editLabel, { color: COLORS.danger }]}>Sign out</Text>
-              </TouchableOpacity>
-
-              {/* PROFILE */}
-              <Text style={styles.smallHeader}>PROFILE</Text>
-
-              {/* GIVEN */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Given name</Text>
-                <TextInput
-                  value={givenName}
-                  onChangeText={setGivenName}
-                  placeholder="Given name"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                />
-              </View>
-
-              {/* FAMILY */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Family name</Text>
-                <TextInput
-                  value={familyName}
-                  onChangeText={setFamilyName}
-                  placeholder="Family name"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                />
-              </View>
-
-              {/* EMAIL */}
-              <TouchableOpacity style={styles.rowTouchable} onPress={openEmailOverlay}>
-                <Text style={styles.editLabel}>Email address</Text>
-                <View style={styles.rightInline}>
-                  <Text
-                    style={styles.editValue}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {email}
-                  </Text>
-                  <Feather name="chevron-right" size={18} color={COLORS.subtext} />
-                </View>
-              </TouchableOpacity>
-
-              {/* LOCATION */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Location</Text>
-                <TextInput
-                  value={location}
-                  onChangeText={setLocation}
-                  placeholder="Location"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                />
-              </View>
-
-              {/* WEBSITE */}
-              <View style={styles.rowEditable}>
-                <Text style={styles.editLabel}>Website</Text>
-                <TextInput
-                  value={website}
-                  onChangeText={setWebsite}
-                  placeholder="Website"
-                  placeholderTextColor={COLORS.faint}
-                  style={styles.editInput}
-                />
-              </View>
-
-              {/* BIO */}
-              <TouchableOpacity style={styles.rowTouchable} onPress={openBioOverlay}>
-                <Text style={styles.editLabel}>Bio</Text>
-                <Feather name="chevron-right" size={18} color={COLORS.subtext} />
-              </TouchableOpacity>
-
-              {/* PRONOUN */}
-              <TouchableOpacity style={styles.rowTouchable}>
-                <Text style={styles.editLabel}>Pronoun</Text>
-                <View style={styles.rightInline}>
-                  <Text
-                    style={styles.editValue}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {pronoun}
-                  </Text>
-                  <Feather name="chevron-right" size={18} color={COLORS.subtext} />
-                </View>
-              </TouchableOpacity>
-
-              <View style={{ height: 80 }} />
-            </ScrollView>
-          </Animated.View>
-        </Animated.View>
+          onSave={(user) => {
+            setHandle(user.username);
+            setEmail(user.email);
+            setDisplayName(user.display_name || "");
+            setBio(user.bio || "");
+            setAvatarUrl(user.avatar_url || "");
+          }}
+        />
       )}
 
-      {/* ======================================================
-                 SUB OVERLAY — BIO
-         ====================================================== */}
       {bioOverlayOpen && (
-        <Animated.View style={[styles.settingsOverlay, { opacity: subAnim }]}>
-          <TouchableOpacity
-            style={styles.overlayBackground}
-            onPress={closeBioOverlay}
-          />
-          <Animated.View
-            style={[
-              styles.subSheet,
-              {
-                transform: [
-                  {
-                    translateY: subAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [500, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.sheetHeader}>
-              <TouchableOpacity onPress={closeBioOverlay}>
-                <Text style={styles.sheetCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.sheetTitle}>Bio</Text>
-              <TouchableOpacity onPress={closeBioOverlay}>
-                <Text style={styles.sheetSave}>Save</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ padding: 16 }}>
-              <TextInput
-                multiline
-                placeholder="Write something..."
-                placeholderTextColor={COLORS.subtext}
-                style={styles.bioInput}
-              />
-            </View>
-          </Animated.View>
-        </Animated.View>
+        <BioOverlay subAnim={subAnim} closeBioOverlay={closeBioOverlay} bio={bio} setBio={setBio} />
       )}
 
-      {/* ======================================================
-                 SUB OVERLAY — EMAIL
-         ====================================================== */}
       {emailOverlayOpen && (
-        <Animated.View style={[styles.settingsOverlay, { opacity: subAnim }]}>
-          <TouchableOpacity
-            style={styles.overlayBackground}
-            onPress={closeEmailOverlay}
-          />
-          <Animated.View
-            style={[
-              styles.subSheet,
-              {
-                transform: [
-                  {
-                    translateY: subAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [500, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.sheetHeader}>
-              <TouchableOpacity onPress={closeEmailOverlay}>
-                <Text style={styles.sheetCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.sheetTitle}>Email</Text>
-              <TouchableOpacity onPress={closeEmailOverlay}>
-                <Text style={styles.sheetSave}>Save</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ paddingLeft:15,paddingTop:0 }}>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Email address"
-                placeholderTextColor={COLORS.subtext}
-                style={[
-                  styles.bioInput,
-                  { minHeight: 50 } // same touch height as others
-                ]}
-                autoCapitalize="none"
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              />
-            </View>
-          </Animated.View>
-        </Animated.View>
+        <EmailOverlay
+          subAnim={subAnim}
+          closeEmailOverlay={closeEmailOverlay}
+          email={email}
+          setEmail={setEmail}
+        />
       )}
-
     </SafeAreaView>
   );
 }
 
-/* COMPONENTS — unchanged */
+/* ===================================================================
+   SMALL COMPONENTS
+   =================================================================== */
+
 function InlineStat({ count, label }) {
   return (
     <View style={styles.inlineGroup}>
@@ -488,6 +486,17 @@ function InlineStat({ count, label }) {
     </View>
   );
 }
+// function FavoriteItemCard({ type, id }) {
+//   return (
+//     <View style={styles.sliderItem}>
+//       <View style={styles.cover} />
+//       <Text style={styles.coverTitle}>
+//         {type} {id}
+//       </Text>
+//     </View>
+//   );
+// }
+
 
 const PlaceholderSlider = memo(function Slider({ count, type }) {
   const arr = Array.from({ length: count }).map((_, i) => ({
@@ -512,53 +521,11 @@ const PlaceholderSlider = memo(function Slider({ count, type }) {
   );
 });
 
-function FooterBar({ router, insets }) {
-  return (
-    <View
-      style={{
-        position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 58 + insets.bottom,
-        backgroundColor: "#000",
-        paddingBottom: insets.bottom / 2,
-      }}
-    >
-      <View style={styles.footerRow}>
-        <TouchableOpacity onPress={() => router.replace("/home")} style={styles.footerBtn}>
-          <Feather name="home" size={22} color={COLORS.subtext} />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.replace("/search")} style={styles.footerBtn}>
-          <Feather name="search" size={22} color={COLORS.subtext} />
-        </TouchableOpacity>
-
-        <View style={styles.footerBtn}>
-          <TouchableOpacity style={styles.fab}>
-            <Feather name="plus" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity onPress={() => router.replace("/activity")} style={styles.footerBtn}>
-          <Feather name="message-circle" size={22} color={COLORS.subtext} />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.replace("/profile")} style={styles.footerBtn}>
-          <Feather name="user" size={22} color={COLORS.active} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
 const Tab = memo(function Tab({ label, active, onPress }) {
   return (
     <TouchableOpacity style={styles.tabWrap} onPress={onPress}>
       <View style={styles.tabPad}>
-        <Text style={[styles.tabText, active && styles.tabTextActive]}>
-          {label}
-        </Text>
+        <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
       </View>
       <View style={[styles.tabUnderline, active && styles.tabUnderlineOn]} />
     </TouchableOpacity>
@@ -574,19 +541,22 @@ const Section = ({ title, children, bottomMargin }) => (
   </View>
 );
 
-/* ===== STYLES ===== */
+/* ===================================================================
+   STYLES (UNCHANGED)
+   =================================================================== */
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.screen },
   screen: { flex: 1 },
   scrollContent: { paddingBottom: 40 },
 
   topRightActions: {
-  flexDirection: "row",
-  gap: 14,
-  alignSelf: "flex-end",
-  marginRight: 16,
-  marginTop: 6,
-},
+    flexDirection: "row",
+    gap: 14,
+    alignSelf: "flex-end",
+    marginRight: 16,
+    marginTop: 6,
+  },
 
   iconBtn: {
     width: 36,
@@ -607,13 +577,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
 
   rightCol: { flex: 1 },
-  centeredRightBlock: {
-    justifyContent: "center",
-    height: SIZES.avatar * AVATAR_SCALE,
-  },
+  centeredRightBlock: { justifyContent: "center", height: SIZES.avatar * AVATAR_SCALE },
   nameBig: { color: COLORS.text, fontSize: 30, fontWeight: "800" },
 
   inlineRow: { flexDirection: "row", gap: 22, marginTop: 8 },
@@ -654,133 +622,4 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontWeight: "700",
   },
-
-  footerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    alignItems: "center",
-    height: "100%",
-  },
-  footerBtn: { flex: 1, alignItems: "center" },
-
-  fab: {
-    width: 40,
-    height: 40,
-    borderRadius: 22,
-    backgroundColor: COLORS.active,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  /* ========== SETTINGS ========== */
-
-  settingsOverlay: {
-    position: "absolute",
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-    zIndex: 3000,
-  },
-  overlayBackground: {
-    position: "absolute",
-    top: 0, left: 0, right: 0, bottom: 0,
-  },
-
-  settingsSheet: {
-    width: "100%",
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
-    overflow: "hidden",
-  },
-
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
-  },
-  sheetCancel: { color: COLORS.subtext, fontSize: 16 },
-  sheetTitle: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
-  sheetSave: { color: COLORS.active, fontSize: 16, fontWeight: "700" },
-
-  smallHeader: {
-    fontSize: 13,
-    color: COLORS.subtext,
-    marginLeft: 16,
-    marginTop: 18,
-    marginBottom: 6,
-  },
-  
-
-  rowEditable: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  rowTouchable: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  editLabel: {
-    color: COLORS.text,
-    fontSize: 16,
-  },
-
-  editInput: {
-    color: COLORS.text,
-    fontSize: 16,
-    textAlign: "right",
-    padding: 0,
-    margin: 0,
-    minWidth: 80,
-    flex: 1,
-    maxWidth: "70%",
-  },
-
-  editValue: {
-    color: COLORS.subtext,
-    fontSize: 16,
-    maxWidth: "100%",
-    textAlign: "right",
-  },
-
-  rightInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  /* SUB-SHEETS */
-  subSheet: {
-    height: "60%",
-    width: "100%",
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    overflow: "hidden",
-  },
-
-  bioInput: {
-    width: "100%",
-    color: COLORS.text,
-    fontSize: 16,
-    paddingVertical: 8,
-  },
 });
-

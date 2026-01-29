@@ -1,37 +1,22 @@
-// screens/activity.jsx
-import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
 import {
+  COLORS,
   Dimensions,
+  Feather,
+  SafeAreaView,
   ScrollView,
+  SIZES,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useRouter,
+
+  useSafeAreaInsets,
+  useState,
   View,
-} from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+} from "./shared/imports";
 
-/* ===== Theme ===== */
-const COLORS = {
-  screen: "#121212",
-  navbar: "#000000",
-  text: "#ffffff",
-  subtext: "#bfc6cf",
-  divider: "#232323",
-  active: "#1db954",
-  button: "#1db954",
-  buttonText: "#ffffff",
-  border: "rgba(255,255,255,0.15)",
-};
 
-const SIZES = {
-  pad: 16,
-  radius: 10,
-  navHeight: 52,
-  footerHeight: 58,
-};
 
 export default function Activity() {
   const [activeTab, setActiveTab] = useState("Messages");

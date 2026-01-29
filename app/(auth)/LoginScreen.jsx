@@ -1,5 +1,6 @@
 // app/(auth)/LoginScreen.js
-import React, { useState } from "react";
+import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,10 +12,11 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { api, setToken } from "../../lib/AuthClient";
+import { api } from "../../lib/api.js";
+import { useAuth } from "../../lib/AuthContext.js";
 
 export default function LoginScreen() {
+  const { setAuthToken } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -27,29 +29,27 @@ export default function LoginScreen() {
       setErrorMsg("");
       setLoading(true);
 
-      const res = await api("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password })
-      });
+      const data = await api(
+        "/auth/login",
+        "POST",
+        { email, password }
+      );
 
-      const data = await res.json();
+      await setAuthToken(data.token);
 
-      if (!res.ok) {
-        setErrorMsg(data.error || "Invalid email or password.");
-        return;
-      }
-
-      await setToken(data.token);
       router.replace("/home");
+
     } catch (err) {
-      setErrorMsg("Network error. Try again.");
+      console.log("🔥 Login error:", err);
+      setErrorMsg(err?.error || "Invalid email or password.");
     } finally {
       setLoading(false);
     }
   }
 
+
   function onGuest() {
-    setToken(null); // no token = guest mode
+    setAuthToken(null); // no token = guest mode
     router.replace("/home");
   }
 

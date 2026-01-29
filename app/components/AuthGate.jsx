@@ -10,6 +10,9 @@ import {
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 
+console.log("📥 Loading AuthGate component...");
+
+
 // Unified token getter
 async function getStoredToken() {
   if (Platform.OS === "web") {
@@ -26,6 +29,7 @@ export default function AuthGate({ children }) {
   const checkToken = useCallback(async () => {
     try {
       const token = await getStoredToken();
+      console.log("🔑 Retrieved token from getStoredToken:", token);
       return !!token; // true = logged in, false = guest
     } catch {
       return false;
