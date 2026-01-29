@@ -7,8 +7,11 @@ const pool = new Pool({
 });
 
 pool.on("error", (err) => {
+  if (process.env.NODE_ENV === "test") {
+    return;
+  }
+
   console.error("Unexpected PG error", err);
   process.exit(1);
 });
-
 module.exports = { pool };

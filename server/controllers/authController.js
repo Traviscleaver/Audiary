@@ -21,6 +21,10 @@ async function createUserWithPassword(email, username, password) {
       `INSERT INTO auth_local (user_id, password_hash) VALUES ($1, $2)`,
       [user.user_id, hash]
     );
+    await client.query(`
+      INSERT INTO stats (user_id)
+      VALUES ($1)
+    `, [user.user_id]);
 
     await client.query("COMMIT");
     return user;

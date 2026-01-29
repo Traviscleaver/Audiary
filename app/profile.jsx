@@ -24,12 +24,18 @@ import {
 } from "./lib/imports";
 
 import FooterBar from "./components/MainNavigationFooter";
+import FavoriteItemCard from "./components/FavoriteItemCard";
 
 import BioOverlay from "./components/profile/BioOverlay";
 import EmailOverlay from "./components/profile/EmailOverlay";
 import SettingsOverlay from "./components/profile/SettingsOverlay";
 
-import { getMyProfile, getMyStats } from "../lib/api";
+import {
+  getMyProfile,
+  getMyStats,
+  api
+} from "../lib/api";
+
 
 const TABS = ["Home", "Reviews", "Lists"];
 const AVATAR_SCALE = 1.5;
@@ -52,13 +58,28 @@ export default function Profile() {
   const [website, setWebsite] = useState("");
   const [pronoun, setPronoun] = useState("He / his");
 
+  // Profile data sets
+  const [favourites, setFavourites] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [ratings, setRatings] = useState([]); // not used yet
+  const [diary, setDiary] = useState([]);     // LISTS
+  const [activity, setActivity] = useState([]);
+
+
   // For your Settings UI
   const [givenName, setGivenName] = useState("");
   const [familyName, setFamilyName] = useState("");
 
   const [activeTab, setActiveTab] = useState("Home");
-  console.log("🔥 Profile.jsx mounted")
+
+  // Filtered favorites
+  const favouriteAlbums = favourites.filter(f => f.item_type === "album");
+  const favouriteSongs = favourites.filter(f => f.item_type === "song");
+  const favouriteArtists = favourites.filter(f => f.item_type === "artist");
+
   const { status } = useAuth();
+
 
   useEffect(() => {
     if (status === "guest") {
@@ -67,42 +88,53 @@ export default function Profile() {
   }, [status]);
 
 
-  // ===== LOAD PROFILE =====
   useEffect(() => {
-    console.log("🟡 useEffect triggered");
+    console.log("🟡 Loading profile & all user data");
 
     async function load() {
-      console.log("🟡 load() function created");
-
       try {
-        console.log("🔍 Calling getMyProfile()...");
-        // console.log("🔑 Stored token:", await SecureStore.getItemAsync("auth_token"));
+        const prof = await getMyProfile();
         console.log("🔍 TOKEN FROM SECURESTORE:", await SecureStore.getItemAsync("auth_token"));
-        const res = await getMyProfile();
-        console.log("🟢 PROFILE RESPONSE:", res);
-
-        if (!res || !res.user) {
-          console.log("❌ No user returned");
-        }
-
-        const user = res.user;
+        const user = prof.user;
         setProfile(user);
 
-        console.log("🔍 Fetching stats for:", user.username);
-
-        const statsRes = await getMyStats(user.username);
-        console.log("🟢 STATS RESPONSE:", statsRes);
+        // All secondary data
+        const [
+          statsRes,
+          favRes,
+          reviewsRes,
+          ratingsRes,
+          playlistsRes,
+          diaryRes,
+          activityRes
+        ] = await Promise.all([
+          getMyStats(user.username),
+          api(`/users/${user.username}/favorites`),
+          api(`/users/${user.username}/reviews`),
+          api(`/users/${user.username}/ratings`),
+          api(`/users/${user.username}/playlists`),
+          api(`/users/${user.username}/diary`),
+          api(`/users/${user.username}/activity`)
+        ]);
 
         setStats(statsRes.stats || {});
+        setFavourites(favRes.favorites || []);
+        setReviews(reviewsRes.reviews || []);
+        setRatings(ratingsRes.ratings || []);
+        setPlaylists(playlistsRes.playlists || []);
+        setDiary(diaryRes.diary || []);
+        setActivity(activityRes.activity || []);
       } catch (err) {
         console.log("🔥 PROFILE LOAD ERROR:", err);
       } finally {
         setLoading(false);
       }
     }
+ 
 
     load();
   }, []);
+
 
 
 
@@ -242,7 +274,7 @@ export default function Profile() {
         </View>
 
         {/* TAB CONTENT */}
-        {activeTab === "Home" && (
+        {/* {activeTab === "Home" && (
           <>
             <Section title="Favourite Albums">
               <PlaceholderSlider type="album" count={10} />
@@ -257,23 +289,134 @@ export default function Profile() {
               <PlaceholderSlider type="activity" count={14} />
             </Section>
           </>
+        )} */}
+        {activeTab === "Home" && (
+          <>
+            {/* FAVORITE ALBUMS */}
+            <Section title="Favourite Albums">
+              <FlatList
+                horizontal
+                data={favouriteAlbums}
+                keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                renderItem={({ item }) => (
+                  <FavoriteItemCard type="album" id={item.item_id} />
+                )}
+                contentContainerStyle={styles.sliderContent}
+                showsHorizontalScrollIndicator={false}
+              />
+            </Section>
+
+            {/* FAVORITE SONGS */}
+            <Section title="Favourite Songs">
+              <FlatList
+                horizontal
+                data={favouriteSongs}
+                keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                renderItem={({ item }) => (
+                  <FavoriteItemCard type="song" id={item.item_id} />
+                )}
+                contentContainerStyle={styles.sliderContent}
+                showsHorizontalScrollIndicator={false}
+              />
+            </Section>
+
+            {/* FAVORITE ARTISTS */}
+            <Section title="Favourite Artists">
+              <FlatList
+                horizontal
+                data={favouriteArtists}
+                keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                renderItem={({ item }) => (
+                  <FavoriteItemCard type="artist" id={item.item_id} />
+                )}
+                contentContainerStyle={styles.sliderContent}
+                showsHorizontalScrollIndicator={false}
+              />
+            </Section>
+
+            {/* RECENT ACTIVITY */}
+            <Section title="Recent Activity" bottomMargin>
+              {activity.length === 0 ? (
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.placeholderText}>No activity yet.</Text>
+                </View>
+              ) : (
+                activity.map((a) => (
+                  <View key={a.activity_id} style={{ padding: 12 }}>
+                    <Text style={{ color: COLORS.text }}>
+                      {a.type} → {a.description}
+                    </Text>
+                    <Text style={{ color: COLORS.subtext, fontSize: 12 }}>
+                      {new Date(a.created_at).toLocaleString()}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </Section>
+          </>
         )}
 
-        {activeTab === "Reviews" && (
+
+        {/* {activeTab === "Reviews" && (
           <Section title="Reviews">
             <View style={styles.emptyWrap}>
               <Text style={styles.placeholderText}>No reviews yet.</Text>
             </View>
           </Section>
+        )} */}
+        {activeTab === "Reviews" && (
+          <Section title="Reviews">
+            {reviews.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.placeholderText}>No reviews yet.</Text>
+              </View>
+            ) : (
+              reviews.map((r) => (
+                <View key={r.review_id} style={{ padding: 12 }}>
+                  <Text style={{ color: COLORS.text, fontWeight: "700" }}>
+                    {r.song_title}
+                  </Text>
+                  <Text style={{ color: COLORS.active, marginTop: 4 }}>
+                    ★ {r.rating}
+                  </Text>
+                  <Text style={{ color: COLORS.text, marginTop: 6 }}>
+                    {r.content}
+                  </Text>
+                </View>
+              ))
+            )}
+          </Section>
         )}
 
-        {activeTab === "Lists" && (
+
+        {/* {activeTab === "Lists" && (
           <Section title="Lists">
             <View style={styles.emptyWrap}>
               <Text style={styles.placeholderText}>No lists yet.</Text>
             </View>
           </Section>
+        )} */}
+        {activeTab === "Lists" && (
+          <Section title="Lists">
+            {playlists.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.placeholderText}>No playlists yet.</Text>
+              </View>
+            ) : (
+              playlists.map((p) => (
+                <View key={p.playlist_id} style={{ padding: 14 }}>
+                  <Text style={{ color: COLORS.text, fontSize: 18, fontWeight: "800" }}>
+                    {p.title}
+                  </Text>
+                  <Text style={{ color: COLORS.subtext }}>
+                    {p.song_count} songs
+                  </Text>
+                </View>
+              ))
+            )}
+          </Section>
         )}
+
       </ScrollView>
 
       <FooterBar router={router} insets={insets} />
@@ -344,6 +487,17 @@ function InlineStat({ count, label }) {
     </View>
   );
 }
+// function FavoriteItemCard({ type, id }) {
+//   return (
+//     <View style={styles.sliderItem}>
+//       <View style={styles.cover} />
+//       <Text style={styles.coverTitle}>
+//         {type} {id}
+//       </Text>
+//     </View>
+//   );
+// }
+
 
 const PlaceholderSlider = memo(function Slider({ count, type }) {
   const arr = Array.from({ length: count }).map((_, i) => ({

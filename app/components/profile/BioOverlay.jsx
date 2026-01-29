@@ -8,11 +8,37 @@ import {
 } from "../../lib/imports";
 
 import { COLORS } from "../../lib/imports";
+import { updateProfile } from "../../../lib/api";
 
-export default function BioOverlay({ subAnim, closeBioOverlay }) {
+export default function BioOverlay({
+  subAnim,
+  closeBioOverlay,
+  bio,
+  setBio,
+  onSave, // parent callback passed from Profile.jsx (optional but recommended)
+}) {
+
+  const handleSave = async () => {
+    console.log("💾 Saving bio:", bio);
+    try {
+      const res = await updateProfile({ bio });
+
+      // Update Profile.jsx instantly
+      if (onSave) onSave(res.user);
+
+      closeBioOverlay();
+    } catch (err) {
+      console.error("Bio update error:", err);
+      alert(err.error || "Failed to update bio");
+    }
+  };
+
   return (
     <Animated.View style={[styles.settingsOverlay, { opacity: subAnim }]}>
-      <TouchableOpacity style={styles.overlayBackground} onPress={closeBioOverlay} />
+      <TouchableOpacity
+        style={styles.overlayBackground}
+        onPress={closeBioOverlay}
+      />
 
       <Animated.View
         style={[
@@ -29,6 +55,7 @@ export default function BioOverlay({ subAnim, closeBioOverlay }) {
           },
         ]}
       >
+        {/* HEADER */}
         <View style={styles.sheetHeader}>
           <TouchableOpacity onPress={closeBioOverlay}>
             <Text style={styles.sheetCancel}>Cancel</Text>
@@ -36,14 +63,17 @@ export default function BioOverlay({ subAnim, closeBioOverlay }) {
 
           <Text style={styles.sheetTitle}>Bio</Text>
 
-          <TouchableOpacity onPress={closeBioOverlay}>
+          <TouchableOpacity onPress={handleSave}>
             <Text style={styles.sheetSave}>Save</Text>
           </TouchableOpacity>
         </View>
 
+        {/* INPUT */}
         <View style={{ padding: 16 }}>
           <TextInput
             multiline
+            value={bio}
+            onChangeText={setBio}
             placeholder="Write something..."
             placeholderTextColor={COLORS.subtext}
             style={styles.bioInput}
@@ -62,8 +92,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     zIndex: 3000,
   },
-  overlayBackground: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-
+  overlayBackground: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+  },
   subSheet: {
     height: "60%",
     width: "100%",
@@ -80,6 +112,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
   },
+
   sheetCancel: { color: COLORS.subtext, fontSize: 16 },
   sheetTitle: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
   sheetSave: { color: COLORS.active, fontSize: 16, fontWeight: "700" },
@@ -89,5 +122,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 16,
     paddingVertical: 8,
+    minHeight: 150,
+    textAlignVertical: "top",
   },
 });

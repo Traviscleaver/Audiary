@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "dev": "node index.js",
-    "start": "NODE_ENV=production node index.js"
+    "start": "NODE_ENV=production node index.js",
+    "test": "NODE_ENV=test jest"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
