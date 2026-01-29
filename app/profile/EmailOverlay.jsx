@@ -6,7 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   View
-} from "../../shared/imports";
+} from "../shared/imports";
 
 export default function EmailOverlay({
   subAnim,

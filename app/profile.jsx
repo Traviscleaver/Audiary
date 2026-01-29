@@ -23,7 +23,7 @@ import {
   useState
 } from "./shared/imports.js";
 
-import FavoriteItemCard from "./components/FavoriteItemCard.jsx";
+import FavoriteItemCard from "./profile/FavoriteItemCard.jsx";
 import BioOverlay from "./components/profile/BioOverlay.jsx";
 import EmailOverlay from "./components/profile/EmailOverlay.jsx";
 import SettingsOverlay from "./components/profile/SettingsOverlay.jsx";
