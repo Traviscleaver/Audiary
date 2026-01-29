@@ -21,19 +21,18 @@ import {
   useRouter,
   useSafeAreaInsets,
   useState
-} from "./lib/imports";
+} from "./shared/imports.js";
 
-import FooterBar from "./components/MainNavigationFooter";
-import FavoriteItemCard from "./components/FavoriteItemCard";
-
-import BioOverlay from "./components/profile/BioOverlay";
-import EmailOverlay from "./components/profile/EmailOverlay";
-import SettingsOverlay from "./components/profile/SettingsOverlay";
+import FavoriteItemCard from "./components/FavoriteItemCard.jsx";
+import BioOverlay from "./components/profile/BioOverlay.jsx";
+import EmailOverlay from "./components/profile/EmailOverlay.jsx";
+import SettingsOverlay from "./components/profile/SettingsOverlay.jsx";
+import FooterBar from "./shared/components/FooterBar.jsx";
 
 import {
+  api,
   getMyProfile,
-  getMyStats,
-  api
+  getMyStats
 } from "../lib/api";
 
 

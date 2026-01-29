@@ -1,28 +1,38 @@
-// components/SubDetailView.jsx
+// DetailScreenOverlay.jsx
+// Full-screen slide-in overlay for a selected search result (track/album/artist).
+// Handles open/close animation and swipe-to-dismiss gestures.
 
-// This shows the results of a track pressed while inside an album
-
+import React from "react";
 import {
   Animated,
   COLORS,
-  PanResponder
-} from "../lib/imports";
+  PanResponder,
+  useSafeAreaInsets
+} from "../../imports";
 
-import HeaderBar from "./OverlayHeaderBar";
-import DetailBody from "./SearchResultDetailContent";
+import DetailContent from "./DetailContent";
+import DetailHeader from "./DetailHeader";
 
-export default function SubDetailView({
+export default function DetailScreenOverlay({
   open,
   setOpen,
   detailType,
   detailItem,
+  detailLoading,
+  albumTracks,
+  showAllAlbumTracks,
+  setShowAllAlbumTracks,
+  getAlbumTracksSpotify,
 }) {
-  const SCREEN_WIDTH = 1000; // overwritten in Home.jsx at runtime
+  const insets = useSafeAreaInsets();
+
+  // ===== ANIMATION =====
+  const SCREEN_WIDTH = 1000; // replaced in home but overwritten at runtime
   const anim = new Animated.Value(SCREEN_WIDTH);
-
   const scrollRef = React.useRef(null);
+  const scrollYRef = React.useRef(0);
 
-  // ===== SWIPE-TO-CLOSE =====
+  // ===== SWIPE TO CLOSE =====
   const panResponder = React.useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
@@ -33,7 +43,7 @@ export default function SubDetailView({
       },
 
       onPanResponderRelease: (_, g) => {
-        if (g.dx > SCREEN_WIDTH / 3) close();
+        if (g.dx > SCREEN_WIDTH / 3) closeDetail();
         else {
           Animated.timing(anim, {
             toValue: 0,
@@ -45,7 +55,7 @@ export default function SubDetailView({
     })
   ).current;
 
-  // ===== OPEN ANIMATION =====
+  // ===== OPEN DETAIL =====
   React.useEffect(() => {
     if (open) {
       anim.setValue(SCREEN_WIDTH);
@@ -57,8 +67,8 @@ export default function SubDetailView({
     }
   }, [open]);
 
-  // ===== CLOSE =====
-  const close = () => {
+  // ===== CLOSE DETAIL =====
+  const closeDetail = () => {
     Animated.timing(anim, {
       toValue: SCREEN_WIDTH,
       duration: 260,
@@ -74,14 +84,15 @@ export default function SubDetailView({
     <Animated.View
       {...panResponder.panHandlers}
       style={[
-        styles.overlay,
+        styles.fullOverlay,
         {
           transform: [{ translateX: anim }],
           backgroundColor: COLORS.screen,
         },
       ]}
     >
-      <HeaderBar
+      {/* HEADER */}
+      <DetailHeader
         title={
           detailType === "Tracks"
             ? "Track"
@@ -89,34 +100,31 @@ export default function SubDetailView({
             ? "Album"
             : "Artist"
         }
-        onBack={close}
+        onBack={closeDetail}
       />
 
-      <DetailBody
+      {/* BODY */}
+      <DetailContent
         type={detailType}
         item={detailItem}
-        loading={false}
-        tracks={[]} // no tracks inside sub-detail
-        showAll={false}
-        setShowAll={() => {}}
+        loading={detailLoading}
+        tracks={albumTracks}
+        showAll={showAllAlbumTracks}
+        setShowAll={setShowAllAlbumTracks}
         scrollRef={scrollRef}
-        scrollYRef={{ current: 0 }}
+        scrollYRef={scrollYRef}
       />
     </Animated.View>
   );
 }
 
 const styles = {
-  overlay: {
+  fullOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1100,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+    zIndex: 1000,
   },
 };

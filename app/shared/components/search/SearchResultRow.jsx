@@ -1,6 +1,6 @@
-// components/RowItem.jsx
-
-//Displays the results of a search (album,artist,track)
+// SearchResultRow.jsx
+// Single row item displayed in the search results list (album/artist/track).
+// Shows thumbnail, title/subtitle, explicit badge, and chevron. Calls onPress when tapped.
 
 import {
   COLORS,
@@ -10,9 +10,9 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "../lib/imports";
+} from "../../imports";
 
-export default function RowItem({ item, isArtist, onPress }) {
+export default function SearchResultRow({ item, isArtist, onPress }) {
   const img =
     item.coverUrl ||
     item.imageUrl ||
@@ -21,11 +21,9 @@ export default function RowItem({ item, isArtist, onPress }) {
     null;
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={styles.row}
-      activeOpacity={0.7}
-    >
+  
+
+    <TouchableOpacity onPress={onPress} style={styles.row} activeOpacity={0.7}>
       {/* IMAGE / PLACEHOLDER */}
       {img ? (
         <Image
@@ -52,24 +50,10 @@ export default function RowItem({ item, isArtist, onPress }) {
 
       {/* TEXT */}
       <View style={{ flex: 1, paddingRight: 10 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
           {item.explicit ? (
-            <View
-              style={styles.explicitBadge}
-            >
-              <Text
-                style={{
-                  color: COLORS.text,
-                  fontWeight: "700",
-                  fontSize: 12,
-                }}
-              >
+            <View style={styles.explicitBadge}>
+              <Text style={{ color: COLORS.text, fontWeight: "700", fontSize: 12 }}>
                 E
               </Text>
             </View>

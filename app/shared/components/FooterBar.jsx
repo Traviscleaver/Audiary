@@ -1,6 +1,15 @@
-// components/FooterBar.jsx
+/* 
+Footer Bar
+
+A fixed bottom navigation bar for the app. It reads the current route using `usePathname()`,
+renders 5 tabs (Home, Search, Add, Activity, Profile), highlights the active tab, and uses
+`router.replace()` to navigate without stacking routes. The center "Add" tab is a special
+styled plus button.
+*/
+
+
 import { usePathname } from "expo-router";
-import { COLORS, Feather, TouchableOpacity, View } from "../lib/imports";
+import { COLORS, Feather, TouchableOpacity, View } from "../imports";
 
 export default function FooterBar({ router, insets }) {
   const pathname = usePathname();

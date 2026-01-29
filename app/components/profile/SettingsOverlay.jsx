@@ -1,3 +1,7 @@
+import { useRouter } from "expo-router";
+import { updateProfile } from "../../../lib/api";
+import { useAuth } from "../../../lib/AuthContext.js";
+import { logout } from "../../../lib/logout";
 import {
   Animated,
   COLORS,
@@ -7,11 +11,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "../../lib/imports";
-import { useRouter } from "expo-router";
-import { updateProfile } from "../../../lib/api";
-import { useAuth } from "../../../lib/AuthContext.js";
-import { logout } from "../../../lib/logout";
+} from "../../shared/imports.js";
 
 export default function SettingsOverlay({
   settingsAnim,

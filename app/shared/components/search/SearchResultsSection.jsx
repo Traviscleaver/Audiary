@@ -1,25 +1,12 @@
-// components/UniversalSectionList.jsx
-import { Feather } from "@expo/vector-icons";
-import {
-    FlatList,
-    Image,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
-import { COLORS, SIZES } from "../lib/imports";
+// SearchResultsSection.jsx
+// Reusable titled section list for search results (albums/tracks/artists).
+// Displays rows with artwork + title/subtitle and a "View all..." button.
 
-/**
- * Universal Section List
- *
- * Props:
- * - title: string
- * - data: array of items
- * - type: "Albums" | "Tracks" | "Artists"
- * - onOpen: (item, type) => void
- * - onViewAll: (type) => void
- */
-export default function UniversalSectionList({
+import { Feather } from "@expo/vector-icons";
+import { FlatList, Image, Text, TouchableOpacity, View } from "react-native";
+import { COLORS, SIZES } from "../../imports";
+
+export default function SearchResultsSection({
   title,
   data,
   type,
@@ -118,10 +105,7 @@ export default function UniversalSectionList({
         keyExtractor={(i) => String(i.id)}
       />
 
-      <TouchableOpacity
-        onPress={() => onViewAll(type)}
-        style={{ marginTop: 10 }}
-      >
+      <TouchableOpacity onPress={() => onViewAll(type)} style={{ marginTop: 10 }}>
         <Text style={{ color: COLORS.subtext, fontSize: 14 }}>
           View all {title.toLowerCase()}...
         </Text>

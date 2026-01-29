@@ -1,9 +1,18 @@
-// components/SectionList.jsx
-import { FlatList, Text, TouchableOpacity, View } from "react-native";
-import { COLORS } from "../theme";
-import RowItem from "./SearchResultRow";
+// SearchResultsPreviewSection.jsx
+// Small titled section used on the search/home screen to preview results (albums/tracks/artists).
+// Renders a short list of rows plus a "View all..." action.
 
-export default function SectionList({ title, data, type, onOpen, onViewAll }) {
+import { FlatList, Text, TouchableOpacity, View } from "react-native";
+import { COLORS } from "../../imports";
+import SearchResultRow from "./SearchResultRow";
+
+export default function SearchResultsPreviewSection({
+  title,
+  data,
+  type,
+  onOpen,
+  onViewAll,
+}) {
   if (!data || data.length === 0) return null;
 
   return (
@@ -23,20 +32,16 @@ export default function SectionList({ title, data, type, onOpen, onViewAll }) {
         data={data}
         keyExtractor={(i) => String(i.id)}
         renderItem={({ item }) => (
-          <RowItem
+          <SearchResultRow
             item={item}
             isArtist={type === "Artists"}
-            onPress={() => onOpen(item, type)} // FIXED
+            onPress={() => onOpen(item, type)}
           />
         )}
         scrollEnabled={false}
       />
 
-      {/* VIEW ALL BUTTON */}
-      <TouchableOpacity
-        onPress={() => onViewAll(type)} // FIXED
-        style={{ marginTop: 10 }}
-      >
+      <TouchableOpacity onPress={() => onViewAll(type)} style={{ marginTop: 10 }}>
         <Text style={{ color: COLORS.subtext, fontSize: 14 }}>
           View all {title.toLowerCase()}...
         </Text>

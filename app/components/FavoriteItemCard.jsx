@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+<<<<<<< HEAD
 import { View, Text, Image, TouchableOpacity } from "react-native";
 import {
   getAlbumByIdSpotify,
@@ -6,6 +7,15 @@ import {
   getArtistByIdSpotify,
 } from "../../api/spotify";
 import { COLORS, SIZES } from "../lib/imports";
+=======
+import { Image, Text, TouchableOpacity, View } from "react-native";
+import {
+  getAlbumByIdSpotify,
+  getArtistByIdSpotify,
+  getSongByIdSpotify,
+} from "../../api/spotify";
+import { COLORS, SIZES } from "../shared/imports";
+>>>>>>> origin/main
 
 export default function FavoriteItemCard({ type, id }) {
   const [data, setData] = useState(null);

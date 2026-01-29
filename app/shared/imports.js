@@ -29,5 +29,5 @@ export {
     searchTracksSpotify
 } from "../../api/spotify";
 
-export { COLORS, SIZES } from "../theme";
+export { COLORS, SIZES } from "./theme/index";
 
