@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { View, Text, Image, TouchableOpacity } from "react-native";
+import { Image, Text, TouchableOpacity, View } from "react-native";
 import {
   getAlbumByIdSpotify,
-  getSongByIdSpotify,
   getArtistByIdSpotify,
+  getSongByIdSpotify,
 } from "../../api/spotify";
-import { COLORS, SIZES } from "../lib/imports";
+import { COLORS, SIZES } from "../shared/imports";
 
 export default function FavoriteItemCard({ type, id }) {
   const [data, setData] = useState(null);

@@ -1,18 +1,23 @@
-// app/hooks/useOverlay.js
+/**
+ * useResultsOverlayController
+ * Controls the "View All" results overlay: which type is shown, what query it uses,
+ * the fetched full result list, loading state, slide animation, and swipe-to-close gesture.
+ */
+
 import { useRef, useState } from "react";
 import { Animated, Dimensions, PanResponder } from "react-native";
 
 import {
-    searchAlbumsSpotify,
-    searchArtistsSpotify,
-    searchTracksSpotify,
-} from "../../api/spotify";
+  searchAlbumsSpotify,
+  searchArtistsSpotify,
+  searchTracksSpotify,
+} from "../../../api/spotify";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-export default function useOverlay() {
+export default function useResultsOverlayController() {
   const [overlayType, setOverlayType] = useState(null);
-  const [overlayQuery, setOverlayQuery] = useState("");    // ⭐ REQUIRED
+  const [overlayQuery, setOverlayQuery] = useState("");
   const [overlayData, setOverlayData] = useState([]);
   const [overlayLoading, setOverlayLoading] = useState(false);
 
@@ -44,7 +49,7 @@ export default function useOverlay() {
   /* ===== OPEN ===== */
   const openOverlay = async (type, query) => {
     setOverlayType(type);
-    setOverlayQuery(query);     // ⭐ REQUIRED
+    setOverlayQuery(query);
     setOverlayLoading(true);
     setOverlayData([]);
 
@@ -85,7 +90,7 @@ export default function useOverlay() {
       useNativeDriver: true,
     }).start(() => {
       setOverlayType(null);
-      setOverlayQuery("");   // ⭐ RESET
+      setOverlayQuery("");
       setOverlayData([]);
       setOverlayLoading(false);
     });
@@ -93,7 +98,7 @@ export default function useOverlay() {
 
   return {
     overlayType,
-    overlayQuery,        // ⭐⭐ MUST BE RETURNED
+    overlayQuery,
     overlayData,
     overlayLoading,
     overlayAnim,

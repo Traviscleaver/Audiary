@@ -1,16 +1,21 @@
-// hooks/useDetail.js
+/**
+ * useDetailOverlayController
+ * Controls the main detail overlay (album/track/artist) and the nested sub-detail overlay.
+ * Manages slide animations, swipe-to-close, and album track fetching for album detail views.
+ */
+
 import {
-    Animated,
-    Dimensions,
-    PanResponder,
-    getAlbumTracksSpotify,
-    useRef,
-    useState,
-} from "../lib/imports";
+  Animated,
+  Dimensions,
+  PanResponder,
+  getAlbumTracksSpotify,
+  useRef,
+  useState,
+} from "../imports";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-export default function useDetail() {
+export default function useDetailOverlayController() {
   /* ====== DETAIL STATE ====== */
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailType, setDetailType] = useState(null);

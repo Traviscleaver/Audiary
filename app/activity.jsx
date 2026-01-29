@@ -14,7 +14,7 @@ import {
   useSafeAreaInsets,
   useState,
   View,
-} from "./lib/imports";
+} from "./shared/imports";
 
 
 

@@ -1,21 +1,26 @@
-// hooks/useSearchHome.js
+/**
+ * useSearchController
+ * Handles the search overlay state + query updates, including debounced Spotify searches.
+ * Includes a small in-memory cache for instant results and swipe-to-close gesture handling.
+ */
+
 import {
-    Animated,
-    Dimensions,
-    PanResponder,
-    searchAlbumsSpotify,
-    searchArtistsSpotify,
-    searchTracksSpotify,
-    useEffect,
-    useRef,
-    useState,
-} from "../lib/imports";
+  Animated,
+  Dimensions,
+  PanResponder,
+  searchAlbumsSpotify,
+  searchArtistsSpotify,
+  searchTracksSpotify,
+  useEffect,
+  useRef,
+  useState,
+} from "../imports";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const DEFAULT_DEBOUNCE_MS = 100;
 const MAX_RESULTS = 5;
 
-export default function useSearchHome() {
+export default function useSearchController() {
   /* ===== STATE ===== */
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");

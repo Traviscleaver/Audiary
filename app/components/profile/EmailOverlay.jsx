@@ -1,12 +1,12 @@
 import {
   Animated,
+  COLORS,
+  StyleSheet,
   Text,
-  TouchableOpacity,
   TextInput,
-  View,
-  StyleSheet
-} from "../../lib/imports";
-import { COLORS } from "../../lib/imports";
+  TouchableOpacity,
+  View
+} from "../../shared/imports";
 
 export default function EmailOverlay({
   subAnim,

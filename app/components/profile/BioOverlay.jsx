@@ -1,13 +1,13 @@
 import {
   Animated,
+  COLORS,
+  StyleSheet,
   Text,
-  TouchableOpacity,
   TextInput,
+  TouchableOpacity,
   View,
-  StyleSheet
-} from "../../lib/imports";
+} from "../../shared/imports";
 
-import { COLORS } from "../../lib/imports";
 import { updateProfile } from "../../../lib/api";
 
 export default function BioOverlay({

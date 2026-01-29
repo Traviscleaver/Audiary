@@ -1,15 +1,18 @@
-// components/HeaderBar.jsx
-import {
-    COLORS,
-    Feather,
-    SIZES,
-    Text,
-    TouchableOpacity,
-    useSafeAreaInsets,
-    View,
-} from "../lib/imports";
+// DetailHeader.jsx
+// Top header bar used inside the detail overlay screen.
+// Shows a back button and a centered title, respecting safe area inset.
 
-export default function HeaderBar({ title, onBack }) {
+import {
+  COLORS,
+  Feather,
+  SIZES,
+  Text,
+  TouchableOpacity,
+  useSafeAreaInsets,
+  View,
+} from "../../imports";
+
+export default function DetailHeader({ title, onBack }) {
   const insets = useSafeAreaInsets();
 
   return (
