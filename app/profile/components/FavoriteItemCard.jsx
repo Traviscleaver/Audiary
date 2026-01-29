@@ -4,8 +4,8 @@ import {
   getAlbumByIdSpotify,
   getArtistByIdSpotify,
   getSongByIdSpotify,
-} from "../../api/spotify";
-import { COLORS, SIZES } from "../shared/imports";
+} from "../../../api/spotify";
+import { COLORS, SIZES } from "../../shared/imports";
 
 export default function FavoriteItemCard({ type, id }) {
   const [data, setData] = useState(null);

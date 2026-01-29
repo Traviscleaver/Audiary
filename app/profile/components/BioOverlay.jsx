@@ -6,9 +6,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "../shared/imports";
+} from "../../shared/imports";
 
-import { updateProfile } from "../../lib/api";
+import { updateProfile } from "../../../lib/api";
 
 
 export default function BioOverlay({

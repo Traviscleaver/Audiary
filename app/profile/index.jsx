@@ -1,7 +1,7 @@
 // profile.jsx
 // profile.jsx
 import * as SecureStore from "expo-secure-store";
-import { useAuth } from "../lib/AuthContext.js";
+import { useAuth } from "../../lib/AuthContext";
 import {
   Animated,
   COLORS,
@@ -21,19 +21,19 @@ import {
   useRouter,
   useSafeAreaInsets,
   useState
-} from "./shared/imports.js";
+} from "../shared/imports";
 
-import FavoriteItemCard from "./profile/FavoriteItemCard.jsx";
-import BioOverlay from "./components/profile/BioOverlay.jsx";
-import EmailOverlay from "./components/profile/EmailOverlay.jsx";
-import SettingsOverlay from "./components/profile/SettingsOverlay.jsx";
-import FooterBar from "./shared/components/FooterBar.jsx";
+import FooterBar from "../shared/components/FooterBar.jsx";
+import FavoriteItemCard from "./components/FavoriteItemCard.jsx";
+import BioOverlay from "./components/BioOverlay.jsx";
+import EmailOverlay from "./components/EmailOverlay.jsx";
+import SettingsOverlay from "./components/SettingsOverlay.jsx";
 
 import {
   api,
   getMyProfile,
   getMyStats
-} from "../lib/api";
+} from "../../lib/api";
 
 
 const TABS = ["Home", "Reviews", "Lists"];

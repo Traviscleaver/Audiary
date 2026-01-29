@@ -1,7 +1,7 @@
 import React from "react";
 import { TouchableOpacity, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { useAuth } from "../../lib/AuthContext";
+import { useAuth } from "../../../lib/AuthContext";
 
 export default function LogoutButton() {
   const router = useRouter();
