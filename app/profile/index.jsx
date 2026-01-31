@@ -1,7 +1,7 @@
 // profile.jsx
-// profile.jsx
-import * as SecureStore from "expo-secure-store";
-import { useAuth } from "../../lib/AuthContext";
+import useProfileOverlays from "./hooks/useProfileOverlays";
+import useProfileData from "./hooks/useProfileData";
+
 import {
   Animated,
   COLORS,
@@ -29,23 +29,29 @@ import BioOverlay from "./components/BioOverlay.jsx";
 import EmailOverlay from "./components/EmailOverlay.jsx";
 import SettingsOverlay from "./components/SettingsOverlay.jsx";
 
-import {
-  api,
-  getMyProfile,
-  getMyStats
-} from "../../lib/api";
-
 
 const TABS = ["Home", "Reviews", "Lists"];
 const AVATAR_SCALE = 1.5;
 
 export default function Profile() {
+
+
+  const {
+    status,
+    profile,
+    loadingExtra,
+    stats,
+    favourites,
+    playlists,
+    reviews,
+    ratings,
+    diary,
+    activity,
+  } = useProfileData();
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [profile, setProfile] = useState(null);
-  const [stats, setStats] = useState({});
-  const [loading, setLoading] = useState(true);
 
   // ===== USER STATE =====
   const [handle, setHandle] = useState("");
@@ -57,87 +63,38 @@ export default function Profile() {
   const [website, setWebsite] = useState("");
   const [pronoun, setPronoun] = useState("He / his");
 
-  // Profile data sets
-  const [favourites, setFavourites] = useState([]);
-  const [playlists, setPlaylists] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [ratings, setRatings] = useState([]); // not used yet
-  const [diary, setDiary] = useState([]);     // LISTS
-  const [activity, setActivity] = useState([]);
-
-
+  // const [loadingExtra, setLoadingExtra] = useState(false);
+  
   // For your Settings UI
   const [givenName, setGivenName] = useState("");
   const [familyName, setFamilyName] = useState("");
 
   const [activeTab, setActiveTab] = useState("Home");
 
-  // Filtered favorites
-  const favouriteAlbums = favourites.filter(f => f.item_type === "album");
-  const favouriteSongs = favourites.filter(f => f.item_type === "song");
-  const favouriteArtists = favourites.filter(f => f.item_type === "artist");
-
-  const { status } = useAuth();
+  const showFavPlaceholders = loadingExtra && favourites.length === 0;
 
 
-  useEffect(() => {
-    if (status === "guest") {
-      router.replace("/(auth)/LoginScreen");
-    }
-  }, [status]);
 
-
-  useEffect(() => {
-    console.log("🟡 Loading profile & all user data");
-
-    async function load() {
-      try {
-        const prof = await getMyProfile();
-        console.log("🔍 TOKEN FROM SECURESTORE:", await SecureStore.getItemAsync("auth_token"));
-        const user = prof.user;
-        setProfile(user);
-
-        // All secondary data
-        const [
-          statsRes,
-          favRes,
-          reviewsRes,
-          ratingsRes,
-          playlistsRes,
-          diaryRes,
-          activityRes
-        ] = await Promise.all([
-          getMyStats(user.username),
-          api(`/users/${user.username}/favorites`),
-          api(`/users/${user.username}/reviews`),
-          api(`/users/${user.username}/ratings`),
-          api(`/users/${user.username}/playlists`),
-          api(`/users/${user.username}/diary`),
-          api(`/users/${user.username}/activity`)
-        ]);
-
-        setStats(statsRes.stats || {});
-        setFavourites(favRes.favorites || []);
-        setReviews(reviewsRes.reviews || []);
-        setRatings(ratingsRes.ratings || []);
-        setPlaylists(playlistsRes.playlists || []);
-        setDiary(diaryRes.diary || []);
-        setActivity(activityRes.activity || []);
-      } catch (err) {
-        console.log("🔥 PROFILE LOAD ERROR:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
- 
-
-    load();
-  }, []);
+  const {
+    settingsOpen,
+    bioOverlayOpen,
+    emailOverlayOpen,
+    settingsAnim,
+    subAnim,
+    openSettings,
+    closeSettings,
+    openBioOverlay,
+    closeBioOverlay,
+    openEmailOverlay,
+    closeEmailOverlay,
+  } = useProfileOverlays();
 
 
 
 
-  // ===== HYDRATE UI FROM PROFILE =====
+
+
+  // ===== Hydrate local UI fields from profile (when profile changes) =====
   useEffect(() => {
     if (!profile) return;
 
@@ -146,73 +103,61 @@ export default function Profile() {
     setDisplayName(profile.display_name || "");
     setBio(profile.bio || "");
     setAvatarUrl(profile.avatar_url || "");
+    setLocation(profile.location || "");
+    setWebsite(profile.website || "");
 
-    // Split name for settings UI
     if (profile.display_name) {
-      const parts = profile.display_name.split(" ");
+      const parts = profile.display_name.trim().split(/\s+/);
       setGivenName(parts[0] || "");
-      setFamilyName(parts[1] || "");
+      setFamilyName(parts.slice(1).join(" ") || "");
+    } else {
+      setGivenName("");
+      setFamilyName("");
     }
+
   }, [profile]);
 
-  /* ========== SETTINGS OVERLAY STATE ========== */
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [bioOverlayOpen, setBioOverlayOpen] = useState(false);
-  const [emailOverlayOpen, setEmailOverlayOpen] = useState(false);
+  const [favouriteAlbums, setFavouriteAlbums] = useState([]);
+  const [favouriteSongs, setFavouriteSongs] = useState([]);
+  const [favouriteArtists, setFavouriteArtists] = useState([]);
 
-  const settingsAnim = useRef(new Animated.Value(0)).current;
-  const subAnim = useRef(new Animated.Value(0)).current;
+  // Filtered favorites
+  useEffect(() => {
+    setFavouriteAlbums(favourites.filter(f => f.item_type === "album"));
+    setFavouriteSongs(favourites.filter(f => f.item_type === "song"));
+    setFavouriteArtists(favourites.filter(f => f.item_type === "artist"));
+    // setLoadingExtra(false);
+  } , [favourites]);
 
-  const openSettings = () => {
-    setSettingsOpen(true);
-    Animated.timing(settingsAnim, {
-      toValue: 1,
-      duration: 240,
-      useNativeDriver: true,
-    }).start();
-  };
 
-  const closeSettings = () => {
-    Animated.timing(settingsAnim, {
-      toValue: 0,
-      duration: 240,
-      useNativeDriver: true,
-    }).start(() => setSettingsOpen(false));
-  };
+  if (status !== "logged-in") return <Text>Please log in.</Text>;
 
-  const openBioOverlay = () => {
-    setBioOverlayOpen(true);
-    Animated.timing(subAnim, {
-      toValue: 1,
-      duration: 240,
-      useNativeDriver: true,
-    }).start();
-  };
+  // Only block if we don't have profile yet
+  if (!profile) return <Text>Loading profile...</Text>;
 
-  const closeBioOverlay = () => {
-    Animated.timing(subAnim, {
-      toValue: 0,
-      duration: 240,
-      useNativeDriver: true,
-    }).start(() => setBioOverlayOpen(false));
-  };
 
-  const openEmailOverlay = () => {
-    setEmailOverlayOpen(true);
-    Animated.timing(subAnim, {
-      toValue: 1,
-      duration: 240,
-      useNativeDriver: true,
-    }).start();
-  };
+  const PlaceholderSlider = memo(function PlaceholderSlider({ count, type }) {
+    const arr = Array.from({ length: count }).map((_, i) => ({
+      id: `${type}-${i}`,
+    }));
 
-  const closeEmailOverlay = () => {
-    Animated.timing(subAnim, {
-      toValue: 0,
-      duration: 240,
-      useNativeDriver: true,
-    }).start(() => setEmailOverlayOpen(false));
-  };
+    return (
+      <FlatList
+        horizontal
+        data={arr}
+        keyExtractor={(i) => i.id}
+        renderItem={() => (
+          <View style={styles.sliderItem}>
+            <View style={styles.cover} />
+            <View style={{ height: 10 }} />
+            <View style={styles.placeholderLine} />
+          </View>
+        )}
+        contentContainerStyle={styles.sliderContent}
+        showsHorizontalScrollIndicator={false}
+      />
+    );
+  });
 
   return (
     <SafeAreaView style={[styles.safe, { paddingTop: 0 }]}>
@@ -272,41 +217,31 @@ export default function Profile() {
           ))}
         </View>
 
-        {/* TAB CONTENT */}
-        {/* {activeTab === "Home" && (
-          <>
-            <Section title="Favourite Albums">
-              <PlaceholderSlider type="album" count={10} />
-            </Section>
-            <Section title="Favourite Songs">
-              <PlaceholderSlider type="song" count={12} />
-            </Section>
-            <Section title="Favourite Artists">
-              <PlaceholderSlider type="artist" count={12} />
-            </Section>
-            <Section title="Recent Activity" bottomMargin>
-              <PlaceholderSlider type="activity" count={14} />
-            </Section>
-          </>
-        )} */}
+
         {activeTab === "Home" && (
           <>
             {/* FAVORITE ALBUMS */}
             <Section title="Favourite Albums">
-              <FlatList
-                horizontal
-                data={favouriteAlbums}
-                keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
-                renderItem={({ item }) => (
-                  <FavoriteItemCard type="album" id={item.item_id} />
-                )}
-                contentContainerStyle={styles.sliderContent}
-                showsHorizontalScrollIndicator={false}
-              />
+              {loadingExtra ? (
+                <PlaceholderSlider type="album" count={10} />
+              ) : (
+                <FlatList
+                  horizontal
+                  data={favouriteAlbums}
+                  keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                  renderItem={({ item }) => <FavoriteItemCard type="album" id={item.item_id} />}
+                  contentContainerStyle={styles.sliderContent}
+                  showsHorizontalScrollIndicator={false}
+                />
+              )}
             </Section>
+
 
             {/* FAVORITE SONGS */}
             <Section title="Favourite Songs">
+              {loadingExtra ? (
+                <PlaceholderSlider type="album" count={10} />
+              ) : (
               <FlatList
                 horizontal
                 data={favouriteSongs}
@@ -317,10 +252,14 @@ export default function Profile() {
                 contentContainerStyle={styles.sliderContent}
                 showsHorizontalScrollIndicator={false}
               />
+              )}
             </Section>
 
             {/* FAVORITE ARTISTS */}
             <Section title="Favourite Artists">
+              {loadingExtra ? (
+                <PlaceholderSlider type="album" count={10} />
+              ) : (
               <FlatList
                 horizontal
                 data={favouriteArtists}
@@ -331,6 +270,7 @@ export default function Profile() {
                 contentContainerStyle={styles.sliderContent}
                 showsHorizontalScrollIndicator={false}
               />
+              )}
             </Section>
 
             {/* RECENT ACTIVITY */}
@@ -498,28 +438,7 @@ function InlineStat({ count, label }) {
 // }
 
 
-const PlaceholderSlider = memo(function Slider({ count, type }) {
-  const arr = Array.from({ length: count }).map((_, i) => ({
-    id: `${type}-${i}`,
-    title: `${type} ${i + 1}`,
-  }));
 
-  return (
-    <FlatList
-      horizontal
-      data={arr}
-      keyExtractor={(i) => i.id}
-      renderItem={({ item }) => (
-        <View style={styles.sliderItem}>
-          <View style={styles.cover} />
-          <Text style={styles.coverTitle}>{item.title}</Text>
-        </View>
-      )}
-      contentContainerStyle={styles.sliderContent}
-      showsHorizontalScrollIndicator={false}
-    />
-  );
-});
 
 const Tab = memo(function Tab({ label, active, onPress }) {
   return (
@@ -622,4 +541,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontWeight: "700",
   },
+
+  // placeholderLine: {
+  //   height: 10,
+  //   borderRadius: 6,
+  //   backgroundColor: COLORS.card, // or COLORS.divider if you have it
+  //   opacity: 0.7,
+  //   width: "80%",
+  // },
+
 });
