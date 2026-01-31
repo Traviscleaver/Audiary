@@ -1,6 +1,6 @@
 // app/(auth)/LoginScreen.js
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,18 +11,23 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "../../lib/api.js";
 import { useAuth } from "../../lib/AuthContext.js";
+import { getMyProfile } from "../../lib/api.js";
 
 export default function LoginScreen() {
-  const { setAuthToken } = useAuth();
+  const { setAuthToken, continueAsGuest, saveProfile } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+
+
 
   async function onLogin() {
     try {
@@ -37,6 +42,7 @@ export default function LoginScreen() {
 
       await setAuthToken(data.token);
 
+
       router.replace("/home");
 
     } catch (err) {
@@ -47,9 +53,34 @@ export default function LoginScreen() {
     }
   }
 
+  
+  useEffect(() => {
+    console.log("🟡 Loading profile & all user data");
 
-  function onGuest() {
-    setAuthToken(null); // no token = guest mode
+    async function load() {
+      try {
+        let token = await SecureStore.getItemAsync("auth_token");
+        console.log("🔍 TOKEN FROM SECURESTORE:", token);
+        if (token === null) {
+          console.log("No auth token found, skipping profile load.");
+          return;
+        }
+        const prof = await getMyProfile();
+        await saveProfile(prof.user);
+
+
+      } catch (err) {
+        console.log("🔥 PROFILE LOAD ERROR:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+
+  async function onGuest() {
+    await continueAsGuest();
     router.replace("/home");
   }
 

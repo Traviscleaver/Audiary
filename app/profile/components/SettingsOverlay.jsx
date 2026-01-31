@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
 import { updateProfile } from "../../../lib/api";
 import { useAuth } from "../../../lib/AuthContext";
-import { logout } from "../../../lib/logout";
+// import {  onLogout } from "./LogoutButton"
+import { logout } from "../../shared/utils/logout";
 import {
   Animated,
   COLORS,
@@ -41,7 +42,7 @@ export default function SettingsOverlay({
   onSave,
 }) {
   const router = useRouter();
-  const { setAuthToken } = useAuth();
+  const { setAuthToken, setProfile } = useAuth();
 
   const handleSave = async () => {
     try {
@@ -149,7 +150,7 @@ export default function SettingsOverlay({
           </TouchableOpacity>
 
           {/* SIGN OUT */}
-          <TouchableOpacity style={styles.rowTouchable} onPress={logout}>
+          <TouchableOpacity style={styles.rowTouchable} onPress={() => logout(setAuthToken, setProfile)}>
             <Text style={[styles.editLabel, { color: COLORS.danger }]}>
               Sign out
             </Text>

@@ -1,6 +1,20 @@
-import { Redirect } from "expo-router";
+import { useEffect } from "react";
+import { useRouter } from "expo-router";
+import { useAuth } from "../lib/AuthContext"; // adjust path
 
 export default function Index() {
-  // Always send guests straight to /home without using router.push
-  return <Redirect href="/LoginScreen" />;
+  const router = useRouter();
+  const { status } = useAuth(); // "checking" | "guest" | "logged-in"
+
+  useEffect(() => {
+    if (status === "checking") return; // not ready yet
+
+    if (status === "logged-in") {
+      router.replace("/home");
+    } else {
+      router.replace("/LoginScreen");
+    }
+  }, [status, router]);
+
+  return null; // render nothing while redirecting
 }
