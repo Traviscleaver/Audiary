@@ -1,70 +1,55 @@
-import React, { useState, useCallback } from "react";
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform
-} from "react-native";
-import * as SecureStore from "expo-secure-store";
+// app/shared/components/AuthGate.jsx
+import React, { useEffect, useState, useCallback } from "react";
+import { Modal, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
+import { useAuth } from "../../../lib/AuthContext"; // adjust path if needed
 
-console.log("📥 Loading AuthGate component...");
-
-
-// Unified token getter
-async function getStoredToken() {
-  if (Platform.OS === "web") {
-    return localStorage.getItem("auth_token");
-  }
-  return SecureStore.getItemAsync("auth_token");
-}
-
-export default function AuthGate({ children }) {
+export default function AuthGate({
+  children,
+  mode = "onEnter", // "onEnter" | "onAction"
+  title = "Login required",
+  message = "You need an account to use this feature.",
+  loginRoute = "/(auth)/LoginScreen",
+  onCancel = "back", // "back" | "stay"
+}) {
   const router = useRouter();
+  const { status } = useAuth();
+
   const [visible, setVisible] = useState(false);
-  const [queuedAction, setQueuedAction] = useState(null);
 
-  const checkToken = useCallback(async () => {
-    try {
-      const token = await getStoredToken();
-      console.log("🔑 Retrieved token from getStoredToken:", token);
-      return !!token; // true = logged in, false = guest
-    } catch {
-      return false;
-    }
-  }, []);
+  // ✅ Auto-open when entering the screen (if guest)
+  useEffect(() => {
+    if (mode !== "onEnter") return;
+    if (status === "logged-in") return;
+    setVisible(true);
+  }, [mode, status]);
 
+  // ✅ Reusable for button gating too (if you ever want it)
   const gate = useCallback(
-    async (action) => {
-      const authed = await checkToken();
-
-      if (authed) {
-        action && action();
-        return;
-      }
-
-      // Not logged in → show modal
-      setQueuedAction(() => action);
+    (action) => {
+      if (status === "logged-in") return action?.();
       setVisible(true);
     },
-    [checkToken]
+    [status]
   );
 
-  const close = () => setVisible(false);
-
-  const goLogin = () => {
+  const handleNotNow = () => {
     setVisible(false);
-    router.push("/(auth)/LoginScreen");
+
+    if (onCancel === "back") {
+      // go back to previous page
+      if (router.canGoBack?.()) router.back();
+      else router.replace("/"); // fallback if no history
+    }
   };
 
-  const continueGuest = () => {
-    // They stay as guest, modal closes.
+  const handleLogin = () => {
     setVisible(false);
+    router.push(loginRoute);
   };
 
-  // Support function-as-children or regular children
+  // If mode is onEnter, just render children normally (page exists, modal blocks)
+  // If mode is onAction, allow function-as-children to use gate()
   const content =
     typeof children === "function" ? children(gate) : children;
 
@@ -72,36 +57,27 @@ export default function AuthGate({ children }) {
     <>
       {content}
 
-      <Modal visible={visible} transparent animationType="fade">
+      <Modal 
+        visible={visible} 
+        transparent 
+        animationType="fade" 
+        presentationStyle="overFullScreen"     // ✅ iOS: allow seeing underlying screen
+        statusBarTranslucent={true}  
+        onRequestClose={handleNotNow}>
         <View style={styles.overlay}>
           <View style={styles.card}>
-            <Text style={styles.title}>Login required</Text>
-            <Text style={styles.message}>
-              You need an account to use this feature.
-            </Text>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.message}>{message}</Text>
 
             <View style={styles.row}>
-              <TouchableOpacity style={styles.secondary} onPress={continueGuest}>
+              <TouchableOpacity style={styles.secondary} onPress={handleNotNow}>
                 <Text style={styles.secondaryText}>Not now</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.primary} onPress={goLogin}>
+              <TouchableOpacity style={styles.primary} onPress={handleLogin}>
                 <Text style={styles.primaryText}>Log in</Text>
               </TouchableOpacity>
             </View>
-
-            {/* Optional: Run protected action anyway as guest
-            <TouchableOpacity
-              style={[styles.secondary, { marginTop: 10 }]}
-              onPress={() => {
-                setVisible(false);
-                queuedAction?.();
-                setQueuedAction(null);
-              }}
-            >
-              <Text style={styles.secondaryText}>Do it anyway</Text>
-            </TouchableOpacity>
-            */}
           </View>
         </View>
       </Modal>
@@ -112,10 +88,10 @@ export default function AuthGate({ children }) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 24
+    padding: 24,
   },
   card: {
     width: "100%",
@@ -123,7 +99,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 18,
     borderWidth: 1,
-    borderColor: "#2a2a2a"
+    borderColor: "#2a2a2a",
   },
   title: { color: "#fff", fontSize: 18, fontWeight: "700" },
   message: { color: "#bfc6cf", marginTop: 8 },
@@ -131,13 +107,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
     flexDirection: "row",
     justifyContent: "flex-end",
-    gap: 10
+    gap: 10,
   },
   primary: {
     backgroundColor: "#1db954",
     borderRadius: 10,
     paddingVertical: 10,
-    paddingHorizontal: 14
+    paddingHorizontal: 14,
   },
   primaryText: { color: "#000", fontWeight: "700" },
   secondary: {
@@ -145,7 +121,7 @@ const styles = StyleSheet.create({
     borderColor: "#2e2e2e",
     borderRadius: 10,
     paddingVertical: 10,
-    paddingHorizontal: 14
+    paddingHorizontal: 14,
   },
-  secondaryText: { color: "#fff", fontWeight: "600" }
+  secondaryText: { color: "#fff", fontWeight: "600" },
 });

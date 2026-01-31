@@ -1,9 +1,8 @@
 // profile.jsx
-import useProfileOverlays from "./hooks/useProfileOverlays";
 import useProfileData from "./hooks/useProfileData";
+import useProfileOverlays from "./hooks/useProfileOverlays";
 
 import {
-  Animated,
   COLORS,
   Feather,
   FlatList,
@@ -17,16 +16,16 @@ import {
   View,
   memo,
   useEffect,
-  useRef,
   useRouter,
   useSafeAreaInsets,
   useState
 } from "../shared/imports";
 
+import AuthGate from "../shared/components/AuthGate.jsx";
 import FooterBar from "../shared/components/FooterBar.jsx";
-import FavoriteItemCard from "./components/FavoriteItemCard.jsx";
 import BioOverlay from "./components/BioOverlay.jsx";
 import EmailOverlay from "./components/EmailOverlay.jsx";
+import FavoriteItemCard from "./components/FavoriteItemCard.jsx";
 import SettingsOverlay from "./components/SettingsOverlay.jsx";
 
 
@@ -96,7 +95,10 @@ export default function Profile() {
 
   // ===== Hydrate local UI fields from profile (when profile changes) =====
   useEffect(() => {
-    if (!profile) return;
+    if (!profile) {
+      console.log("No profile to load into UI fields.");
+      return;
+    }
 
     setHandle(profile.username || "");
     setEmail(profile.email || "");
@@ -130,11 +132,6 @@ export default function Profile() {
   } , [favourites]);
 
 
-  if (status !== "logged-in") return <Text>Please log in.</Text>;
-
-  // Only block if we don't have profile yet
-  if (!profile) return <Text>Loading profile...</Text>;
-
 
   const PlaceholderSlider = memo(function PlaceholderSlider({ count, type }) {
     const arr = Array.from({ length: count }).map((_, i) => ({
@@ -159,12 +156,19 @@ export default function Profile() {
     );
   });
 
-  return (
+  // if (!profile) return <Text style={{ color: COLORS.text }}>Loading profile...</Text>;
+
+const isGuest = status !== "logged-in";
+
+return (
+  <AuthGate
+    mode="onEnter"
+    onCancel="back"
+    message="Log in to view your profile."
+  >
     <SafeAreaView style={[styles.safe, { paddingTop: 0 }]}>
-
       <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.topRightActions, { top: insets.top + 4 }]}>
-
+        <View style={[styles.topRightActions, { top: 25 }]}>
           <TouchableOpacity style={styles.iconBtn}>
             <Feather name="share-2" size={20} color={COLORS.text} />
           </TouchableOpacity>
@@ -179,14 +183,10 @@ export default function Profile() {
           <View style={styles.headerRow}>
             <View style={styles.leftCol}>
               <View style={styles.avatar}>
-                {avatarUrl ? (
+                {!isGuest && avatarUrl ? (
                   <Image
                     source={{ uri: avatarUrl }}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      borderRadius: 999,
-                    }}
+                    style={{ width: "100%", height: "100%", borderRadius: 999 }}
                   />
                 ) : (
                   <Feather name="user" size={48} color={COLORS.subtext} />
@@ -197,13 +197,13 @@ export default function Profile() {
             <View style={styles.rightCol}>
               <View style={styles.centeredRightBlock}>
                 <Text style={styles.nameBig}>
-                  {displayName || handle || "User"}
+                  {isGuest ? "Guest" : (displayName || handle || "User")}
                 </Text>
 
                 <View style={styles.inlineRow}>
-                  <InlineStat count={stats.total_reviews || 0} label="reviews" />
-                  <InlineStat count={stats.total_ratings || 0} label="ratings" />
-                  <InlineStat count={stats.total_songs_listened || 0} label="listens" />
+                  <InlineStat count={isGuest ? 0 : (stats.total_reviews || 0)} label="reviews" />
+                  <InlineStat count={isGuest ? 0 : (stats.total_ratings || 0)} label="ratings" />
+                  <InlineStat count={isGuest ? 0 : (stats.total_songs_listened || 0)} label="listens" />
                 </View>
               </View>
             </View>
@@ -217,12 +217,11 @@ export default function Profile() {
           ))}
         </View>
 
-
+        {/* HOME */}
         {activeTab === "Home" && (
           <>
-            {/* FAVORITE ALBUMS */}
             <Section title="Favourite Albums">
-              {loadingExtra ? (
+              {(isGuest || loadingExtra) ? (
                 <PlaceholderSlider type="album" count={10} />
               ) : (
                 <FlatList
@@ -236,55 +235,49 @@ export default function Profile() {
               )}
             </Section>
 
-
-            {/* FAVORITE SONGS */}
             <Section title="Favourite Songs">
-              {loadingExtra ? (
-                <PlaceholderSlider type="album" count={10} />
+              {(isGuest || loadingExtra) ? (
+                <PlaceholderSlider type="song" count={10} />
               ) : (
-              <FlatList
-                horizontal
-                data={favouriteSongs}
-                keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
-                renderItem={({ item }) => (
-                  <FavoriteItemCard type="song" id={item.item_id} />
-                )}
-                contentContainerStyle={styles.sliderContent}
-                showsHorizontalScrollIndicator={false}
-              />
+                <FlatList
+                  horizontal
+                  data={favouriteSongs}
+                  keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                  renderItem={({ item }) => <FavoriteItemCard type="song" id={item.item_id} />}
+                  contentContainerStyle={styles.sliderContent}
+                  showsHorizontalScrollIndicator={false}
+                />
               )}
             </Section>
 
-            {/* FAVORITE ARTISTS */}
             <Section title="Favourite Artists">
-              {loadingExtra ? (
-                <PlaceholderSlider type="album" count={10} />
+              {(isGuest || loadingExtra) ? (
+                <PlaceholderSlider type="artist" count={10} />
               ) : (
-              <FlatList
-                horizontal
-                data={favouriteArtists}
-                keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
-                renderItem={({ item }) => (
-                  <FavoriteItemCard type="artist" id={item.item_id} />
-                )}
-                contentContainerStyle={styles.sliderContent}
-                showsHorizontalScrollIndicator={false}
-              />
+                <FlatList
+                  horizontal
+                  data={favouriteArtists}
+                  keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                  renderItem={({ item }) => <FavoriteItemCard type="artist" id={item.item_id} />}
+                  contentContainerStyle={styles.sliderContent}
+                  showsHorizontalScrollIndicator={false}
+                />
               )}
             </Section>
 
-            {/* RECENT ACTIVITY */}
             <Section title="Recent Activity" bottomMargin>
-              {activity.length === 0 ? (
+              {isGuest ? (
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.placeholderText}>Log in to see activity.</Text>
+                </View>
+              ) : activity.length === 0 ? (
                 <View style={styles.emptyWrap}>
                   <Text style={styles.placeholderText}>No activity yet.</Text>
                 </View>
               ) : (
                 activity.map((a) => (
                   <View key={a.activity_id} style={{ padding: 12 }}>
-                    <Text style={{ color: COLORS.text }}>
-                      {a.type} → {a.description}
-                    </Text>
+                    <Text style={{ color: COLORS.text }}>{a.type} → {a.description}</Text>
                     <Text style={{ color: COLORS.subtext, fontSize: 12 }}>
                       {new Date(a.created_at).toLocaleString()}
                     </Text>
@@ -294,100 +287,31 @@ export default function Profile() {
             </Section>
           </>
         )}
-
-
-        {/* {activeTab === "Reviews" && (
-          <Section title="Reviews">
-            <View style={styles.emptyWrap}>
-              <Text style={styles.placeholderText}>No reviews yet.</Text>
-            </View>
-          </Section>
-        )} */}
-        {activeTab === "Reviews" && (
-          <Section title="Reviews">
-            {reviews.length === 0 ? (
-              <View style={styles.emptyWrap}>
-                <Text style={styles.placeholderText}>No reviews yet.</Text>
-              </View>
-            ) : (
-              reviews.map((r) => (
-                <View key={r.review_id} style={{ padding: 12 }}>
-                  <Text style={{ color: COLORS.text, fontWeight: "700" }}>
-                    {r.song_title}
-                  </Text>
-                  <Text style={{ color: COLORS.active, marginTop: 4 }}>
-                    ★ {r.rating}
-                  </Text>
-                  <Text style={{ color: COLORS.text, marginTop: 6 }}>
-                    {r.content}
-                  </Text>
-                </View>
-              ))
-            )}
-          </Section>
-        )}
-
-
-        {/* {activeTab === "Lists" && (
-          <Section title="Lists">
-            <View style={styles.emptyWrap}>
-              <Text style={styles.placeholderText}>No lists yet.</Text>
-            </View>
-          </Section>
-        )} */}
-        {activeTab === "Lists" && (
-          <Section title="Lists">
-            {playlists.length === 0 ? (
-              <View style={styles.emptyWrap}>
-                <Text style={styles.placeholderText}>No playlists yet.</Text>
-              </View>
-            ) : (
-              playlists.map((p) => (
-                <View key={p.playlist_id} style={{ padding: 14 }}>
-                  <Text style={{ color: COLORS.text, fontSize: 18, fontWeight: "800" }}>
-                    {p.title}
-                  </Text>
-                  <Text style={{ color: COLORS.subtext }}>
-                    {p.song_count} songs
-                  </Text>
-                </View>
-              ))
-            )}
-          </Section>
-        )}
-
       </ScrollView>
 
       <FooterBar router={router} insets={insets} />
 
-      {/* ======= SETTINGS OVERLAY ======= */}
-      {settingsOpen && (
+      {/* overlays only make sense when logged in */}
+      {!isGuest && settingsOpen && (
         <SettingsOverlay
           settingsAnim={settingsAnim}
           closeSettings={closeSettings}
-
           handle={handle}
           setHandle={setHandle}
-
           givenName={givenName}
           setGivenName={setGivenName}
           familyName={familyName}
           setFamilyName={setFamilyName}
-
           email={email}
-
           location={location}
           setLocation={setLocation}
           website={website}
           setWebsite={setWebsite}
           pronoun={pronoun}
-
           openBioOverlay={openBioOverlay}
           openEmailOverlay={openEmailOverlay}
-
           avatarUrl={avatarUrl}
           setAvatarUrl={setAvatarUrl}
-
           onSave={(user) => {
             setHandle(user.username);
             setEmail(user.email);
@@ -397,21 +321,11 @@ export default function Profile() {
           }}
         />
       )}
-
-      {bioOverlayOpen && (
-        <BioOverlay subAnim={subAnim} closeBioOverlay={closeBioOverlay} bio={bio} setBio={setBio} />
-      )}
-
-      {emailOverlayOpen && (
-        <EmailOverlay
-          subAnim={subAnim}
-          closeEmailOverlay={closeEmailOverlay}
-          email={email}
-          setEmail={setEmail}
-        />
-      )}
     </SafeAreaView>
-  );
+  </AuthGate>
+);
+
+
 }
 
 /* ===================================================================
@@ -469,13 +383,21 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   scrollContent: { paddingBottom: 40 },
 
+  // topRightActions: {
+  //   flexDirection: "row",
+  //   gap: 14,
+  //   alignSelf: "flex-end",
+  //   marginRight: 16,
+  //   marginTop: -10,
+  // },
   topRightActions: {
+    position: "absolute",
+    right: 16,
     flexDirection: "row",
     gap: 14,
-    alignSelf: "flex-end",
-    marginRight: 16,
-    marginTop: 6,
+    zIndex: 9999,
   },
+
 
   iconBtn: {
     width: 36,
@@ -486,7 +408,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  headerWrap: { paddingHorizontal: SIZES.pad, paddingTop: SIZES.pad + 30 },
+  headerWrap: { paddingHorizontal: SIZES.pad, paddingTop: SIZES.pad },
   headerRow: { flexDirection: "row" },
   leftCol: { width: SIZES.avatar * AVATAR_SCALE + 10, marginRight: 12 },
   avatar: {
