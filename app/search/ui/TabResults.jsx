@@ -26,8 +26,6 @@ export default function TabResults({
       </View>
     );
   }
-  console.log("TabResults tab=", tab?.key, "query=", q, "data=", data);
-
   const sections = tab.getPreviewSections({ data, query: q });
   const hasAny = sections.some((s) => (s.data || []).length > 0);
 

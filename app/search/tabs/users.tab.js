@@ -7,7 +7,7 @@ function normalizeQuery(q) {
 
 export default {
   key: "Users",
-  placeholder: "Search users",
+  placeholder: "Search Users",
 
   previewSearch: async ({ query, limit = 5 } = {}) => {
     const q = normalizeQuery(query);

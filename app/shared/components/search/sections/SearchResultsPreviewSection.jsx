@@ -16,16 +16,7 @@ export default function SearchResultsPreviewSection({
   if (type === "Users") {
     return (
       <View style={{ marginBottom: 28 }}>
-        <Text
-          style={{
-            fontSize: 22,
-            fontWeight: "800",
-            color: COLORS.text,
-            marginBottom: 12,
-          }}
-        >
-          {title}
-        </Text>
+
 
         <FlatList
           data={data}
