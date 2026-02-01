@@ -168,6 +168,50 @@ exports.getUserReviews = async (req, res) => {
 };
 
 // =======================================
+// GET /users/search?q=<query>&limit=<limit>
+// =======================================
+exports.searchUsers = async (req, res) => {
+  try {
+    const qRaw = String(req.query.q || "").trim();
+    const q = qRaw.toLowerCase();
+    const limit = Math.min(parseInt(req.query.limit || "20", 10), 50);
+
+    if (q.length < 2) return res.json({ users: [] });
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.user_id,
+        u.username,
+        u.display_name,
+        u.avatar_url,
+        u.joined_at,
+        (SELECT COUNT(*) FROM follows WHERE following_id = u.user_id) AS followers_count
+      FROM users u
+      WHERE
+        LOWER(u.username) LIKE $1
+        OR LOWER(u.display_name) LIKE $1
+      ORDER BY
+        CASE
+          WHEN LOWER(u.username) LIKE $2 THEN 0
+          WHEN LOWER(u.username) LIKE $1 THEN 1
+          WHEN LOWER(u.display_name) LIKE $1 THEN 2
+          ELSE 3
+        END,
+        LOWER(u.username) ASC
+      LIMIT $3
+      `,
+      [`%${q}%`, `${q}%`, limit]
+    );
+
+    return res.json({ users: result.rows });
+  } catch (err) {
+    console.error("searchUsers error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// =======================================
 // GET /users/:username/playlists
 // =======================================
 exports.getUserPlaylists = async (req, res) => {
