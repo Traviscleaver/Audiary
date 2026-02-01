@@ -17,7 +17,9 @@ const {
   getUserStats,
 
   getFullProfile,         // GET /users/:username/full
-  updateProfile           // PUT /profile (self edit)
+  updateProfile,          // PUT /profile (self edit)
+
+  searchUsers,
 } = require("../controllers/userController");
 
 const {
@@ -32,14 +34,23 @@ const {
    PROFILE ROUTES
    ========================================= */
 
+router.get("/__ping", (req, res) => res.json({ ok: true }));
+
+
 // Current logged-in user's profile
 router.get("/profile", authRequired, getProfileSelf);
 
 // Update profile (email, username, name, bio, website, banner, etc.)
 router.put("/profile", authRequired, updateProfile);
 
+// Search users
+router.get("/users/search", authOptional, searchUsers);
+
+
 // Public profile lookup by username
 router.get("/users/:username/profile", authOptional, getProfilePublic);
+
+
 
 
 /* =========================================

@@ -23,7 +23,7 @@ export default function useSearchController({ tab }) {
   const [query, setQuery] = useState("");
 
   const [loadingSearch, setLoadingSearch] = useState(false);
-  const [data, setData] = useState({}); // tab-specific shape (music: albums/tracks/artists, etc)
+  const [data, setData] = useState({}); // tab-specific shape (music: albums/tracks/artists, users, etc)
 
   const searchInputRef = useRef(null);
   const searchAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
@@ -32,10 +32,14 @@ export default function useSearchController({ tab }) {
   const cacheRef = useRef(new Map());
 
   useEffect(() => {
-    if (!searchOpen) return;
+    // ✅ DO NOT REQUIRE searchOpen.
+    // If SearchHeader is just an input on the page (not a sliding overlay),
+    // your fetch was never running. This makes it run whenever query changes.
     if (!tab?.previewSearch) return;
 
     const q = query.trim();
+
+    // Reset if query too short
     if (q.length < 2) {
       setData({});
       setLoadingSearch(false);
@@ -52,11 +56,15 @@ export default function useSearchController({ tab }) {
 
     const timer = setTimeout(async () => {
       try {
-        const res = await tab.previewSearch({ query: q, signal: controller.signal });
+        const res = await tab.previewSearch({
+          query: q,
+          signal: controller.signal,
+        });
         cacheRef.current.set(cacheKey, res);
         setData(res);
       } catch (e) {
-        // ignore abort/errors quietly
+        // ✅ DON'T SILENCE ERRORS - log them so you can see 404s, base path issues, etc.
+        console.log("previewSearch error:", e);
       } finally {
         setLoadingSearch(false);
       }
@@ -66,7 +74,7 @@ export default function useSearchController({ tab }) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, searchOpen, tab?.key]);
+  }, [query, tab?.key]);
 
   const openSearchOverlay = () => {
     setSearchOpen(true);
