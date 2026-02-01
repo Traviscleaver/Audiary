@@ -10,6 +10,7 @@ import {
   SIZES,
   Text,
   TouchableOpacity,
+  useSafeAreaInsets,
   View,
 } from "../../../imports";
 
@@ -24,6 +25,8 @@ export default function DetailContent({
   scrollYRef,
   openSubDetail,
 }) {
+  const insets = useSafeAreaInsets();
+
   if (!item) return null;
 
   const hero =
@@ -38,13 +41,17 @@ export default function DetailContent({
 
   const canOpenTrack = typeof openSubDetail === "function";
 
+  // ✅ space so the floating back button never covers content
+  const topPad = insets.top + SIZES.navHeight + 10;
+
   return (
     <ScrollView
       ref={scrollRef}
       style={{ flex: 1 }}
       contentContainerStyle={{
-        padding: 16,
+        paddingHorizontal: 16,
         paddingBottom: SIZES.footerHeight + 50,
+        paddingTop: topPad,
       }}
       showsVerticalScrollIndicator={false}
       onScroll={(e) => {
@@ -89,29 +96,6 @@ export default function DetailContent({
         </View>
       )}
 
-      {/* ACTION BUTTONS */}
-      <View style={styles.detailActionsRow}>
-        <TouchableOpacity style={styles.rateButton} activeOpacity={0.8}>
-          <Feather name="star" size={18} color="#fff" />
-          <Text style={styles.rateButtonText}>
-            {type === "Tracks"
-              ? "Rate Track"
-              : type === "Albums"
-              ? "Rate Album"
-              : "Rate Artist"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.playButton}
-          activeOpacity={0.8}
-          onPress={() => item.spotifyUrl && Linking.openURL(item.spotifyUrl)}
-        >
-          <Feather name="play" size={18} color="#fff" />
-          <Text style={styles.playButtonText}>Play</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* RATINGS */}
       <View style={styles.ratingsRow}>
         <View style={styles.ratingCol}>
@@ -136,10 +120,34 @@ export default function DetailContent({
         </View>
       </View>
 
+      {/* ACTION BUTTONS */}
+      <View style={styles.detailActionsRow}>
+        <TouchableOpacity style={styles.rateButton} activeOpacity={0.8}>
+          <Feather name="star" size={18} color="#000000ff" />
+          <Text style={styles.rateButtonText}>
+            {type === "Tracks"
+              ? "Rate Track"
+              : type === "Albums"
+              ? "Rate Album"
+              : "Rate Artist"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.playButton}
+          activeOpacity={0.8}
+          onPress={() => item.spotifyUrl && Linking.openURL(item.spotifyUrl)}
+        >
+          {/* ✅ filled play icon */}
+          <FontAwesome name="play" size={16} color="#000000ff" />
+          <Text style={styles.playButtonText}>Play</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* TRACKLIST */}
       {type === "Albums" && (
-        <View style={{ marginTop: 18 }}>
-          <Text style={styles.trackHeader}>Tracks</Text>
+        <View style={{ marginTop: 5 }}>
+
 
           {loading ? (
             <View style={styles.trackLoader}>
@@ -150,7 +158,6 @@ export default function DetailContent({
           ) : (
             <>
               {(showAll ? tracks : tracks.slice(0, 5)).map((t, idx) => {
-                // ✅ FIX: remove ", , ," by cleaning the artists list
                 const artistNames = Array.isArray(t.artists)
                   ? t.artists
                       .map((a) => (typeof a === "string" ? a : a?.name))
@@ -160,13 +167,9 @@ export default function DetailContent({
                       .join(", ")
                   : "";
 
-                const num = t.track_number ?? idx + 1;
-
                 return (
-                  <View key={`${t.id}-${num}`} style={styles.trackRow}>
-                    <View style={{ width: 28 }}>
-                      <Text style={{ color: COLORS.subtext }}>{num}</Text>
-                    </View>
+                  <View key={`${t.id}-${idx}`} style={styles.trackRow}>
+                    {/* ✅ removed track number column */}
 
                     <TouchableOpacity
                       style={{ flex: 1, paddingRight: 10 }}
@@ -191,7 +194,8 @@ export default function DetailContent({
                       )}
                     </TouchableOpacity>
 
-                    <View style={styles.trackButtons}>
+                    {/* stars left, play right */}
+                    <View style={styles.trackButtonsRow}>
                       <View style={styles.trackRatingRow}>
                         <FontAwesome name="star" size={18} color={COLORS.gold} />
                         <Text style={{ color: COLORS.subtext }}>—</Text>
@@ -204,7 +208,8 @@ export default function DetailContent({
                         style={styles.trackPlayButton}
                         activeOpacity={0.85}
                       >
-                        <Feather name="play" size={18} color="#fff" />
+                        {/* ✅ filled play icon */}
+                        <FontAwesome name="play" size={14} color="#000000ff" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -242,13 +247,14 @@ const styles = {
     height: 220,
     backgroundColor: COLORS.field,
   },
-  titleWrap: { alignItems: "center", marginTop: 18 },
+
+  titleWrap: { alignItems: "flex-start", marginTop: 18 },
   detailTitle: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
   detailSub: { color: COLORS.subtext, marginTop: 6 },
 
   detailMeta: {
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     marginTop: 10,
     gap: 8,
@@ -256,11 +262,14 @@ const styles = {
   detailMetaText: { color: COLORS.subtext },
   detailMetaDot: { color: COLORS.subtext },
 
-  // ✅ FIX: restore button backgrounds
   detailActionsRow: {
     flexDirection: "row",
     gap: 10,
     marginTop: 18,
+    borderColor: COLORS.divider,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+
   },
   rateButton: {
     flex: 1,
@@ -272,7 +281,7 @@ const styles = {
     justifyContent: "center",
     gap: 8,
   },
-  rateButtonText: { color: "#fff", fontWeight: "800" },
+  rateButtonText: { color: "#000000ff", fontWeight: "800" },
 
   playButton: {
     width: 120,
@@ -286,7 +295,7 @@ const styles = {
     borderWidth: 1,
     borderColor: COLORS.divider,
   },
-  playButtonText: { color: "#fff", fontWeight: "800" },
+  playButtonText: { color: "#000000ff", fontWeight: "800" },
 
   ratingsRow: {
     flexDirection: "row",
@@ -298,20 +307,23 @@ const styles = {
   ratingLabel: { color: COLORS.subtext, marginTop: 6, fontSize: 12 },
   starRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 
-  trackHeader: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
   trackLoader: { marginTop: 20, alignItems: "center" },
 
   trackRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
   },
   trackTitle: { color: COLORS.text, fontWeight: "800" },
   trackArtist: { color: COLORS.subtext, marginTop: 4 },
 
-  trackButtons: { alignItems: "flex-end", gap: 10 },
+  trackButtonsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    minWidth: 90,
+  },
   trackRatingRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 
   trackPlayButton: {

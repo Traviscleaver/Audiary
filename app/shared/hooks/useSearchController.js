@@ -16,7 +16,7 @@ import {
 } from "../imports";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const DEFAULT_DEBOUNCE_MS = 120;
+const DEFAULT_DEBOUNCE_MS = 400;
 
 export default function useSearchController({ tab }) {
   const [searchOpen, setSearchOpen] = useState(false);

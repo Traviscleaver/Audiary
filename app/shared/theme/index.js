@@ -10,7 +10,7 @@ export const COLORS = {
   faint: "#ffffff88",
   divider: "#212121",
   overlayNav: "#000000",
-  active: "#1db954",
+  active: "#1ED760",
   gold: "#f5c518",
   silver: "#c0c0c0",
   bronze: "#cd7f32",

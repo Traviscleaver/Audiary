@@ -1,11 +1,10 @@
 import {
   ActivityIndicator,
-  COLORS,
   FlatList,
   Image,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "../../shared/imports";
 import { ALBUMS_TAB, TRACKS_TAB } from "../libs/constants";
 import { getPopularSectionState } from "../styles/selectors";
@@ -100,13 +99,6 @@ export default function PopularCarousel({
                 )}
               </View>
 
-                {!!item.rank && (
-                  <View style={styles.rankBubble}>
-                    <Text style={[styles.rankText, { color: COLORS.text }]}>
-                      {item.rank}
-                    </Text>
-                  </View>
-                )}
 
               <Text style={styles.popularGridTitle} numberOfLines={2}>
                 {item.title}
