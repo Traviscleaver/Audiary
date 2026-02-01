@@ -1,7 +1,6 @@
+// app/search/index.jsx
 import {
-  COLORS,
   ScrollView,
-  Text,
   View,
   useRouter,
   useSafeAreaInsets,
@@ -10,39 +9,37 @@ import {
 
 import FooterBar from "../shared/components/FooterBar";
 
-/* Hooks (standardized under shared/hooks) */
 import useDetailOverlayController from "../shared/hooks/useDetailOverlayController";
 import useResultsOverlayController from "../shared/hooks/useResultsOverlayController";
 import useSearchController from "../shared/hooks/useSearchController";
 
-/* Local pieces */
-import MusicResults from "./components/MusicResults";
-import SearchHeader from "./components/SearchHeader";
-import TopTabs from "./components/TopTabs";
 import { styles } from "./styles/styles";
+import SearchHeader from "./ui/SearchHeader";
+import TabResults from "./ui/TabResults";
+import TopTabs from "./ui/TopTabs";
 
-/* Reused overlays (renamed) */
-import { default as DetailScreenOverlay, default as SearchResultsSectionOverlay } from "../shared/components/search/DetailScreenOverlay";
-import NestedDetailOverlay from "../shared/components/search/NestedDetailOverlay";
+import { default as DetailScreenOverlay, default as SearchResultsSectionOverlay } from "../shared/components/search/overlays/DetailScreenOverlay";
+import NestedDetailOverlay from "../shared/components/search/overlays/NestedDetailOverlay";
+
+import { getTabByKey } from "./tabs";
 
 export default function Search() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const [activeTopTab, setActiveTopTab] = useState("Music");
+  const activeTab = getTabByKey(activeTopTab);
+
   const {
     searchOpen,
     query,
-    albums,
-    artists,
-    tracksRes,
-    searchAnim,
+    setQuery,
+    data,
     searchInputRef,
     loadingSearch,
     openSearchOverlay,
     closeSearchOverlay,
-    panResponderSearch,
-    setQuery,
-  } = useSearchController();
+  } = useSearchController({ tab: activeTab });
 
   const {
     overlayType,
@@ -53,36 +50,26 @@ export default function Search() {
     openOverlay,
     closeOverlay,
     panResponderOverlay,
-  } = useResultsOverlayController();
+  } = useResultsOverlayController({ tab: activeTab });
 
   const {
     detailOpen,
     detailItem,
     detailType,
-    detailAnim,
-    detailScrollRef,
-    detailScrollYRef,
     albumTracks,
     detailLoading,
     showAllAlbumTracks,
-
     closeDetail,
 
     subDetailOpen,
     subDetailItem,
     subDetailType,
-    subDetailAnim,
-    subDetailScrollRef,
-
     openDetail,
     openSubDetail,
     closeSubDetail,
-    panResponderDetail,
-    panResponderSubDetail,
+
     setShowAllAlbumTracks,
   } = useDetailOverlayController();
-
-  const [activeTopTab, setActiveTopTab] = useState("Music");
 
   return (
     <View style={styles.screen}>
@@ -94,6 +81,7 @@ export default function Search() {
         openSearchOverlay={openSearchOverlay}
         closeSearchOverlay={closeSearchOverlay}
         searchInputRef={searchInputRef}
+        placeholder={activeTab.placeholder}
       />
 
       <TopTabs activeTab={activeTopTab} setActiveTab={setActiveTopTab} />
@@ -103,28 +91,19 @@ export default function Search() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {activeTopTab === "Music" ? (
-          <MusicResults
-            loadingSearch={loadingSearch}
-            albums={albums}
-            tracksRes={tracksRes}
-            artists={artists}
-            query={query}
-            openDetail={openDetail}
-            openOverlay={openOverlay}
-          />
-        ) : (
-          <View style={{ marginTop: 40, alignItems: "center" }}>
-            <Text style={{ color: COLORS.faint }}>
-              No content for {activeTopTab} yet.
-            </Text>
-          </View>
-        )}
+        <TabResults
+          loading={loadingSearch}
+          tab={activeTab}
+          data={data}
+          query={query}
+          openDetail={openDetail}
+          openOverlay={openOverlay}
+        />
       </ScrollView>
 
       <FooterBar router={router} insets={insets} />
 
-      {/* Reused overlays */}
+      {/* View All overlay (same as before, now tab-driven) */}
       <SearchResultsSectionOverlay
         overlayType={overlayType}
         overlayData={overlayData}
@@ -137,6 +116,7 @@ export default function Search() {
         insetsBottom={insets.bottom}
       />
 
+      {/* Detail overlays (unchanged behavior) */}
       <DetailScreenOverlay
         open={detailOpen}
         setOpen={(v) => (v ? null : closeDetail())}
@@ -148,6 +128,8 @@ export default function Search() {
         setShowAllAlbumTracks={setShowAllAlbumTracks}
         openSubDetail={openSubDetail}
       />
+
+      
 
       <NestedDetailOverlay
         open={subDetailOpen}

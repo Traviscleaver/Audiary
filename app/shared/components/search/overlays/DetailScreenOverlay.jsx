@@ -1,47 +1,45 @@
-// DetailScreenOverlay.jsx
-// Full-screen slide-in overlay for a selected search result (track/album/artist).
-// Handles open/close animation and swipe-to-dismiss gestures.
-
+// app/shared/components/search/overlays/DetailScreenOverlay.jsx
 import React from "react";
-import {
-  Animated,
-  COLORS,
-  PanResponder,
-  useSafeAreaInsets
-} from "../../imports";
+import { Animated, COLORS, Dimensions, PanResponder } from "../../../imports";
 
 import DetailContent from "./DetailContent";
 import DetailHeader from "./DetailHeader";
 
+const SCREEN_WIDTH = Dimensions.get("window").width;
+
 export default function DetailScreenOverlay({
   open,
   setOpen,
+
   detailType,
   detailItem,
+
   detailLoading,
   albumTracks,
   showAllAlbumTracks,
   setShowAllAlbumTracks,
-  getAlbumTracksSpotify,
-}) {
-  const insets = useSafeAreaInsets();
 
-  // ===== ANIMATION =====
-  const SCREEN_WIDTH = 1000; // replaced in home but overwritten at runtime
-  const anim = new Animated.Value(SCREEN_WIDTH);
+  openSubDetail,
+}) {
+  const anim = React.useRef(new Animated.Value(SCREEN_WIDTH)).current;
   const scrollRef = React.useRef(null);
   const scrollYRef = React.useRef(0);
 
-  // ===== SWIPE TO CLOSE =====
+  const closeDetail = React.useCallback(() => {
+    Animated.timing(anim, {
+      toValue: SCREEN_WIDTH,
+      duration: 260,
+      useNativeDriver: true,
+    }).start(() => setOpen(false));
+  }, [anim, setOpen]);
+
   const panResponder = React.useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
         g.dx > 20 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
-
       onPanResponderMove: (_, g) => {
         if (g.dx > 0) anim.setValue(g.dx);
       },
-
       onPanResponderRelease: (_, g) => {
         if (g.dx > SCREEN_WIDTH / 3) closeDetail();
         else {
@@ -55,55 +53,35 @@ export default function DetailScreenOverlay({
     })
   ).current;
 
-  // ===== OPEN DETAIL =====
   React.useEffect(() => {
-    if (open) {
-      anim.setValue(SCREEN_WIDTH);
-      Animated.timing(anim, {
-        toValue: 0,
-        duration: 260,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [open]);
-
-  // ===== CLOSE DETAIL =====
-  const closeDetail = () => {
+    if (!open) return;
+    anim.setValue(SCREEN_WIDTH);
     Animated.timing(anim, {
-      toValue: SCREEN_WIDTH,
+      toValue: 0,
       duration: 260,
       useNativeDriver: true,
-    }).start(() => {
-      setOpen(false);
-    });
-  };
+    }).start();
+  }, [open, anim]);
 
   if (!open) return null;
+
+  const title =
+    detailType === "Tracks"
+      ? "Track"
+      : detailType === "Albums"
+      ? "Album"
+      : "Artist";
 
   return (
     <Animated.View
       {...panResponder.panHandlers}
       style={[
         styles.fullOverlay,
-        {
-          transform: [{ translateX: anim }],
-          backgroundColor: COLORS.screen,
-        },
+        { transform: [{ translateX: anim }], backgroundColor: COLORS.screen },
       ]}
     >
-      {/* HEADER */}
-      <DetailHeader
-        title={
-          detailType === "Tracks"
-            ? "Track"
-            : detailType === "Albums"
-            ? "Album"
-            : "Artist"
-        }
-        onBack={closeDetail}
-      />
+      <DetailHeader title={title} onBack={closeDetail} />
 
-      {/* BODY */}
       <DetailContent
         type={detailType}
         item={detailItem}
@@ -113,6 +91,7 @@ export default function DetailScreenOverlay({
         setShowAll={setShowAllAlbumTracks}
         scrollRef={scrollRef}
         scrollYRef={scrollYRef}
+        openSubDetail={openSubDetail}
       />
     </Animated.View>
   );

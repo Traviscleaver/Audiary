@@ -1,13 +1,3 @@
-/* 
-Footer Bar
-
-A fixed bottom navigation bar for the app. It reads the current route using `usePathname()`,
-renders 5 tabs (Home, Search, Add, Activity, Profile), highlights the active tab, and uses
-`router.replace()` to navigate without stacking routes. The center "Add" tab is a special
-styled plus button.
-*/
-
-
 import { usePathname } from "expo-router";
 import { COLORS, Feather, TouchableOpacity, View } from "../imports";
 
@@ -22,6 +12,9 @@ export default function FooterBar({ router, insets }) {
     { route: "/profile", icon: "user" },
   ];
 
+  const BAR_HEIGHT = 58;
+  const SLOT_HEIGHT = 80; // ✅ big hit target per icon
+
   return (
     <View
       style={{
@@ -29,9 +22,12 @@ export default function FooterBar({ router, insets }) {
         bottom: 0,
         left: 0,
         right: 0,
-        height: 58 + (insets?.bottom || 0),
-        backgroundColor: COLORS.navbar,
-        paddingBottom: insets.bottom > 0 ? insets.bottom / 2 : 6,
+        height: BAR_HEIGHT + (insets?.bottom || 0),
+        backgroundColor: COLORS.screen,
+        borderTopColor: COLORS.divider,
+        borderTopWidth: 1,
+        paddingTop: 6,
+        paddingBottom: insets?.bottom > 0 ? insets.bottom / 2 : 6,
         zIndex: 9999,
       }}
     >
@@ -45,21 +41,33 @@ export default function FooterBar({ router, insets }) {
         }}
       >
         {TABS.map((tab, index) => {
-          const isActive = pathname.startsWith(tab.route);
+          const isActive =
+            tab.route === "/"
+              ? pathname === "/"
+              : pathname.startsWith(tab.route);
 
-          // Special "plus" button in the center
+          // ✅ Center "+" button
           if (tab.isCenter) {
             return (
-              <View key={index} style={{ flex: 1, alignItems: "center" }}>
+              <View
+                key={index}
+                style={{
+                  flex: 1,
+                  height: SLOT_HEIGHT,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
                 <TouchableOpacity
-                  onPress={() => router.replace("/add")}
-                  activeOpacity={0.8}
+                  onPress={() => router.push("/add")}
+                  activeOpacity={0.85}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   style={{
                     alignItems: "center",
                     justifyContent: "center",
-                    width: 40,
+                    width: 65,
                     height: 40,
-                    borderRadius: 22,
+                    borderRadius: 25,
                     backgroundColor: COLORS.active,
                   }}
                 >
@@ -69,16 +77,25 @@ export default function FooterBar({ router, insets }) {
             );
           }
 
+          // ✅ Normal tab: full slot press area
           return (
             <TouchableOpacity
               key={index}
-              onPress={() => !isActive && router.replace(tab.route)}
-              disabled={isActive}
-              style={{ flex: 1, alignItems: "center", opacity: isActive ? 1 : 1 }}
+              onPress={() => {
+                if (!isActive) router.push(tab.route);
+              }}
+              activeOpacity={0.75}
+              hitSlop={{ top: 10, bottom: 10, left: 14, right: 14 }}
+              style={{
+                flex: 1,
+                height: SLOT_HEIGHT, // ✅ makes the whole slot easy to hit
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               <Feather
                 name={tab.icon}
-                size={22}
+                size={25}
                 color={isActive ? COLORS.active : COLORS.subtext}
               />
             </TouchableOpacity>

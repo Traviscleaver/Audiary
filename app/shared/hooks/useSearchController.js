@@ -1,130 +1,78 @@
 /**
- * useSearchController
- * Handles the search overlay state + query updates, including debounced Spotify searches.
- * Includes a small in-memory cache for instant results and swipe-to-close gesture handling.
+ * shared/hooks/useSearchController.js
+ * Generic search controller:
+ * - manages search overlay open/close + query
+ * - debounced fetch using the active tab plugin (tab.previewSearch)
+ * - cache per tab + query so switching tabs feels instant
  */
 
 import {
   Animated,
   Dimensions,
   PanResponder,
-  searchAlbumsSpotify,
-  searchArtistsSpotify,
-  searchTracksSpotify,
   useEffect,
   useRef,
   useState,
 } from "../imports";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const DEFAULT_DEBOUNCE_MS = 100;
-const MAX_RESULTS = 5;
+const DEFAULT_DEBOUNCE_MS = 120;
 
-export default function useSearchController() {
-  /* ===== STATE ===== */
+export default function useSearchController({ tab }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const [albums, setAlbums] = useState([]);
-  const [tracksRes, setTracksRes] = useState([]);
-  const [artists, setArtists] = useState([]);
-
   const [loadingSearch, setLoadingSearch] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [data, setData] = useState({}); // tab-specific shape (music: albums/tracks/artists, etc)
 
   const searchInputRef = useRef(null);
   const searchAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
 
-  const cacheRef = useRef({
-    albums: new Map(),
-    tracks: new Map(),
-    artists: new Map(),
-  });
+  // cache key: `${tabKey}::${query}`
+  const cacheRef = useRef(new Map());
 
-  /* ===== SEARCH EFFECT ===== */
   useEffect(() => {
     if (!searchOpen) return;
+    if (!tab?.previewSearch) return;
 
     const q = query.trim();
     if (q.length < 2) {
-      setAlbums([]);
-      setTracksRes([]);
-      setArtists([]);
+      setData({});
       setLoadingSearch(false);
       return;
     }
 
+    const cacheKey = `${tab.key}::${q}`;
+    const cached = cacheRef.current.get(cacheKey);
+    if (cached) setData(cached);
+
     setLoadingSearch(true);
-    setHasSearched(true);
 
-    // ===== Cached instant results =====
-    const cA = cacheRef.current.albums.get(q);
-    const cT = cacheRef.current.tracks.get(q);
-    const cR = cacheRef.current.artists.get(q);
+    const controller = new AbortController();
 
-    if (cA) setAlbums(cA.slice(0, MAX_RESULTS));
-    if (cT) setTracksRes(cT.slice(0, MAX_RESULTS));
-    if (cR) setArtists(cR.slice(0, MAX_RESULTS));
-
-    const controllerA = new AbortController();
-    const controllerT = new AbortController();
-    const controllerR = new AbortController();
-
-    // Debounce
-    const timer = setTimeout(() => {
-      // Albums
-      (async () => {
-        try {
-          const r = await searchAlbumsSpotify(q, { signal: controllerA.signal });
-          const list = r?.albums || [];
-          cacheRef.current.albums.set(q, list);
-          setAlbums(list.slice(0, MAX_RESULTS));
-        } catch {}
-      })();
-
-      // Tracks
-      (async () => {
-        try {
-          const r = await searchTracksSpotify(q, { signal: controllerT.signal });
-          const list = r?.tracks || [];
-          cacheRef.current.tracks.set(q, list);
-          setTracksRes(list.slice(0, MAX_RESULTS));
-        } catch {}
-      })();
-
-      // Artists
-      (async () => {
-        try {
-          const r = await searchArtistsSpotify(q, { signal: controllerR.signal });
-          const list = r?.artists || [];
-          cacheRef.current.artists.set(q, list);
-          setArtists(list.slice(0, MAX_RESULTS));
-        } catch {}
-      })();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await tab.previewSearch({ query: q, signal: controller.signal });
+        cacheRef.current.set(cacheKey, res);
+        setData(res);
+      } catch (e) {
+        // ignore abort/errors quietly
+      } finally {
+        setLoadingSearch(false);
+      }
     }, DEFAULT_DEBOUNCE_MS);
-
-    const stop = setTimeout(
-      () => setLoadingSearch(false),
-      DEFAULT_DEBOUNCE_MS + 350
-    );
 
     return () => {
       clearTimeout(timer);
-      clearTimeout(stop);
-      controllerA.abort();
-      controllerT.abort();
-      controllerR.abort();
+      controller.abort();
     };
-  }, [query, searchOpen]);
+  }, [query, searchOpen, tab?.key]);
 
-  /* ===== OPEN SEARCH OVERLAY ===== */
   const openSearchOverlay = () => {
     setSearchOpen(true);
     setQuery("");
-    setAlbums([]);
-    setTracksRes([]);
-    setArtists([]);
-    setHasSearched(false);
+    setData({});
+    setLoadingSearch(false);
 
     searchAnim.setValue(SCREEN_WIDTH);
     Animated.timing(searchAnim, {
@@ -136,7 +84,6 @@ export default function useSearchController() {
     });
   };
 
-  /* ===== CLOSE SEARCH OVERLAY ===== */
   const closeSearchOverlay = () => {
     searchInputRef.current?.blur();
 
@@ -147,14 +94,11 @@ export default function useSearchController() {
     }).start(() => {
       setSearchOpen(false);
       setQuery("");
-      setAlbums([]);
-      setTracksRes([]);
-      setArtists([]);
-      setHasSearched(false);
+      setData({});
+      setLoadingSearch(false);
     });
   };
 
-  /* ===== SWIPE TO CLOSE ===== */
   const panResponderSearch = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
@@ -178,15 +122,14 @@ export default function useSearchController() {
   return {
     searchOpen,
     query,
-    albums,
-    tracksRes,
-    artists,
+    setQuery,
     loadingSearch,
-    hasSearched,
+    data,
+
     searchInputRef,
     searchAnim,
     panResponderSearch,
-    setQuery,
+
     openSearchOverlay,
     closeSearchOverlay,
   };

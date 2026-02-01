@@ -1,4 +1,4 @@
-import SubDetailView from "../../shared/components/search/NestedDetailOverlay";
+import SubDetailView from "../../shared/components/search/overlays/NestedDetailOverlay";
 
 export default function SubDetailOverlay({
   subDetailOpen,

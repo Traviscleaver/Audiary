@@ -13,5 +13,5 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-, "api/spotify.js", "app/profile/profile.jsx", "app/login.jsx", "app/home/home.jsx", "app/albumprofile.jsx", "app/activity.jsx", "app/_layout.jsapp/profile/profile.jsxe.jsx", "app/login.jsx", "app/home/home.jsx", "app/albumprofile.jsx", "app/activity.jsx", "app/_layout.jsx"  ]
+, "api/spotify.js", "app/profile/profile.jsx", "app/login.jsx", "app/home/home.jsx", "app/albumprofile.jsx", "app/activity/index.jsx", "app/_layout.jsapp/profile/profile.jsxe.jsx", "app/login.jsx", "app/home/home.jsx", "app/albumprofile.jsx", "app/activity/index.jsx", "app/_layout.jsx"  ]
 }

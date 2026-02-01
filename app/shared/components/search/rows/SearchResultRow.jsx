@@ -1,7 +1,4 @@
-// SearchResultRow.jsx
-// Single row item displayed in the search results list (album/artist/track).
-// Shows thumbnail, title/subtitle, explicit badge, and chevron. Calls onPress when tapped.
-
+// app/shared/components/search/rows/SearchResultRow.jsx
 import {
   COLORS,
   Feather,
@@ -10,9 +7,9 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "../../imports";
+} from "../../../imports";
 
-export default function SearchResultRow({ item, isArtist, onPress }) {
+export default function SearchResultRow({ item, variant = "default", onPress }) {
   const img =
     item.coverUrl ||
     item.imageUrl ||
@@ -20,42 +17,34 @@ export default function SearchResultRow({ item, isArtist, onPress }) {
     item.artistImage ||
     null;
 
-  return (
-  
+  const isArtist = variant === "artist";
 
+  return (
     <TouchableOpacity onPress={onPress} style={styles.row} activeOpacity={0.7}>
-      {/* IMAGE / PLACEHOLDER */}
+      {/* artwork */}
       {img ? (
         <Image
           source={{ uri: img }}
-          style={{
-            width: SIZES.image,
-            height: SIZES.image,
-            borderRadius: isArtist ? SIZES.image / 2 : 8,
-            marginRight: 14,
-            backgroundColor: COLORS.field,
-          }}
+          style={[
+            styles.image,
+            { borderRadius: isArtist ? SIZES.image / 2 : 8 },
+          ]}
         />
       ) : (
         <View
-          style={{
-            width: SIZES.image,
-            height: SIZES.image,
-            borderRadius: isArtist ? SIZES.image / 2 : 8,
-            marginRight: 14,
-            backgroundColor: COLORS.field,
-          }}
+          style={[
+            styles.image,
+            { borderRadius: isArtist ? SIZES.image / 2 : 8 },
+          ]}
         />
       )}
 
-      {/* TEXT */}
-      <View style={{ flex: 1, paddingRight: 10 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+      {/* text */}
+      <View style={styles.textWrap}>
+        <View style={styles.titleRow}>
           {item.explicit ? (
             <View style={styles.explicitBadge}>
-              <Text style={{ color: COLORS.text, fontWeight: "700", fontSize: 12 }}>
-                E
-              </Text>
+              <Text style={styles.explicitText}>E</Text>
             </View>
           ) : null}
 
@@ -64,14 +53,13 @@ export default function SearchResultRow({ item, isArtist, onPress }) {
           </Text>
         </View>
 
-        {item.artist && (
+        {item.artist ? (
           <Text numberOfLines={1} style={styles.sub}>
             {item.artist}
           </Text>
-        )}
+        ) : null}
       </View>
 
-      {/* RIGHT CHEVRON */}
       <Feather name="chevron-right" size={22} color={COLORS.subtext} />
     </TouchableOpacity>
   );
@@ -85,6 +73,21 @@ const styles = {
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
   },
+  image: {
+    width: SIZES.image,
+    height: SIZES.image,
+    marginRight: 14,
+    backgroundColor: COLORS.field,
+  },
+  textWrap: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
   explicitBadge: {
     backgroundColor: COLORS.field,
     borderColor: COLORS.divider,
@@ -93,6 +96,11 @@ const styles = {
     paddingVertical: 2,
     borderRadius: 4,
     marginRight: 6,
+  },
+  explicitText: {
+    color: COLORS.text,
+    fontWeight: "700",
+    fontSize: 12,
   },
   title: {
     color: COLORS.text,

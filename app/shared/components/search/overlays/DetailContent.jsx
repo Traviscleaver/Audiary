@@ -1,7 +1,4 @@
-// DetailContent.jsx
-// Scrollable content area for the detail overlay.
-// Renders hero image, metadata, action buttons, ratings, and optional album tracklist.
-
+// app/shared/components/search/overlays/DetailContent.jsx
 import {
   ActivityIndicator,
   COLORS,
@@ -14,13 +11,13 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "../../imports";
+} from "../../../imports";
 
 export default function DetailContent({
   type,
   item,
   loading,
-  tracks,
+  tracks = [],
   showAll,
   setShowAll,
   scrollRef,
@@ -39,6 +36,8 @@ export default function DetailContent({
   const title = item.title || item.name;
   const subtitle = type === "Artists" ? "" : item.artist || item.album;
 
+  const canOpenTrack = typeof openSubDetail === "function";
+
   return (
     <ScrollView
       ref={scrollRef}
@@ -54,31 +53,27 @@ export default function DetailContent({
       scrollEventThrottle={16}
     >
       {/* HERO IMAGE */}
-      <View style={{ alignItems: "center", marginTop: 8 }}>
+      <View style={styles.heroWrap}>
         {hero ? (
           <Image
             source={{ uri: hero }}
-            style={{
-              width: 220,
-              height: 220,
-              borderRadius: type === "Artists" ? 130 : 18,
-              backgroundColor: COLORS.field,
-            }}
+            style={[
+              styles.hero,
+              { borderRadius: type === "Artists" ? 130 : 18 },
+            ]}
           />
         ) : (
           <View
-            style={{
-              width: 220,
-              height: 220,
-              borderRadius: type === "Artists" ? 130 : 18,
-              backgroundColor: COLORS.field,
-            }}
+            style={[
+              styles.hero,
+              { borderRadius: type === "Artists" ? 130 : 18 },
+            ]}
           />
         )}
       </View>
 
       {/* TITLE */}
-      <View style={{ alignItems: "center", marginTop: 18 }}>
+      <View style={styles.titleWrap}>
         <Text style={styles.detailTitle}>{title}</Text>
         {!!subtitle && <Text style={styles.detailSub}>{subtitle}</Text>}
       </View>
@@ -96,7 +91,7 @@ export default function DetailContent({
 
       {/* ACTION BUTTONS */}
       <View style={styles.detailActionsRow}>
-        <TouchableOpacity style={styles.rateButton}>
+        <TouchableOpacity style={styles.rateButton} activeOpacity={0.8}>
           <Feather name="star" size={18} color="#fff" />
           <Text style={styles.rateButtonText}>
             {type === "Tracks"
@@ -109,6 +104,7 @@ export default function DetailContent({
 
         <TouchableOpacity
           style={styles.playButton}
+          activeOpacity={0.8}
           onPress={() => item.spotifyUrl && Linking.openURL(item.spotifyUrl)}
         >
           <Feather name="play" size={18} color="#fff" />
@@ -154,7 +150,16 @@ export default function DetailContent({
           ) : (
             <>
               {(showAll ? tracks : tracks.slice(0, 5)).map((t, idx) => {
-                const artistNames = t.artists?.join(", ");
+                // ✅ FIX: remove ", , ," by cleaning the artists list
+                const artistNames = Array.isArray(t.artists)
+                  ? t.artists
+                      .map((a) => (typeof a === "string" ? a : a?.name))
+                      .filter(Boolean)
+                      .map((s) => String(s).trim())
+                      .filter((s) => s.length > 0)
+                      .join(", ")
+                  : "";
+
                 const num = t.track_number ?? idx + 1;
 
                 return (
@@ -165,7 +170,10 @@ export default function DetailContent({
 
                     <TouchableOpacity
                       style={{ flex: 1, paddingRight: 10 }}
-                      onPress={() =>
+                      disabled={!canOpenTrack}
+                      onPress={() => {
+                        if (!canOpenTrack) return;
+
                         openSubDetail({
                           id: t.id,
                           name: t.name,
@@ -173,10 +181,11 @@ export default function DetailContent({
                           coverUrl: hero,
                           album: title,
                           spotifyUrl: t.spotifyUrl,
-                        })
-                      }
+                        });
+                      }}
                     >
                       <Text style={styles.trackTitle}>{t.name}</Text>
+
                       {!!artistNames && (
                         <Text style={styles.trackArtist}>{artistNames}</Text>
                       )}
@@ -189,8 +198,11 @@ export default function DetailContent({
                       </View>
 
                       <TouchableOpacity
-                        onPress={() => t.spotifyUrl && Linking.openURL(t.spotifyUrl)}
+                        onPress={() =>
+                          t.spotifyUrl && Linking.openURL(t.spotifyUrl)
+                        }
                         style={styles.trackPlayButton}
+                        activeOpacity={0.85}
                       >
                         <Feather name="play" size={18} color="#fff" />
                       </TouchableOpacity>
@@ -202,7 +214,7 @@ export default function DetailContent({
               {tracks.length > 5 && !showAll && (
                 <TouchableOpacity
                   onPress={() => {
-                    const y = scrollYRef.current || 0;
+                    const y = scrollYRef?.current || 0;
                     setShowAll(true);
                     requestAnimationFrame(() => {
                       scrollRef?.current?.scrollTo({ y, animated: false });
@@ -224,5 +236,90 @@ export default function DetailContent({
 }
 
 const styles = {
-  // ... unchanged styles
+  heroWrap: { alignItems: "center", marginTop: 8 },
+  hero: {
+    width: 220,
+    height: 220,
+    backgroundColor: COLORS.field,
+  },
+  titleWrap: { alignItems: "center", marginTop: 18 },
+  detailTitle: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
+  detailSub: { color: COLORS.subtext, marginTop: 6 },
+
+  detailMeta: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+    gap: 8,
+  },
+  detailMetaText: { color: COLORS.subtext },
+  detailMetaDot: { color: COLORS.subtext },
+
+  // ✅ FIX: restore button backgrounds
+  detailActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18,
+  },
+  rateButton: {
+    flex: 1,
+    backgroundColor: COLORS.active,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  rateButtonText: { color: "#fff", fontWeight: "800" },
+
+  playButton: {
+    width: 120,
+    backgroundColor: COLORS.active,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+  },
+  playButtonText: { color: "#fff", fontWeight: "800" },
+
+  ratingsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 18,
+  },
+  ratingCol: { alignItems: "center", flex: 1 },
+  ratingNumber: { color: COLORS.text, fontWeight: "900", fontSize: 18 },
+  ratingLabel: { color: COLORS.subtext, marginTop: 6, fontSize: 12 },
+  starRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+
+  trackHeader: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
+  trackLoader: { marginTop: 20, alignItems: "center" },
+
+  trackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
+  },
+  trackTitle: { color: COLORS.text, fontWeight: "800" },
+  trackArtist: { color: COLORS.subtext, marginTop: 4 },
+
+  trackButtons: { alignItems: "flex-end", gap: 10 },
+  trackRatingRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+
+  trackPlayButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.active,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 };

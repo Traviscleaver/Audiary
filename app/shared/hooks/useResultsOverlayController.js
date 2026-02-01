@@ -1,9 +1,3 @@
-/**
- * useResultsOverlayController
- * Controls the "View All" results overlay: which type is shown, what query it uses,
- * the fetched full result list, loading state, slide animation, and swipe-to-close gesture.
- */
-
 import { useRef, useState } from "react";
 import { Animated, Dimensions, PanResponder } from "react-native";
 
@@ -11,19 +5,31 @@ import {
   searchAlbumsSpotify,
   searchArtistsSpotify,
   searchTracksSpotify,
-} from "../../../api/spotify";
+} from "../imports";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function useResultsOverlayController() {
-  const [overlayType, setOverlayType] = useState(null);
+  const [overlayType, setOverlayType] = useState(null); // "Albums" | "Tracks" | "Artists"
   const [overlayQuery, setOverlayQuery] = useState("");
   const [overlayData, setOverlayData] = useState([]);
   const [overlayLoading, setOverlayLoading] = useState(false);
 
   const overlayAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
 
-  /* ===== PAN ===== */
+  const closeOverlay = () => {
+    Animated.timing(overlayAnim, {
+      toValue: SCREEN_WIDTH,
+      duration: 260,
+      useNativeDriver: true,
+    }).start(() => {
+      setOverlayType(null);
+      setOverlayQuery("");
+      setOverlayData([]);
+      setOverlayLoading(false);
+    });
+  };
+
   const panResponderOverlay = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
@@ -46,10 +52,11 @@ export default function useResultsOverlayController() {
     })
   ).current;
 
-  /* ===== OPEN ===== */
   const openOverlay = async (type, query) => {
+    const q = String(query || "").trim();
+
     setOverlayType(type);
-    setOverlayQuery(query);
+    setOverlayQuery(q);
     setOverlayLoading(true);
     setOverlayData([]);
 
@@ -60,40 +67,34 @@ export default function useResultsOverlayController() {
       useNativeDriver: true,
     }).start();
 
+    // Prevent blank overlay when query is empty
+    if (q.length < 2) {
+      setOverlayLoading(false);
+      setOverlayData([]);
+      return;
+    }
+
     try {
       let res;
 
-      if (type === "Albums") res = await searchAlbumsSpotify(query);
-      else if (type === "Tracks") res = await searchTracksSpotify(query);
-      else if (type === "Artists") res = await searchArtistsSpotify(query);
+      if (type === "Albums") res = await searchAlbumsSpotify(q);
+      else if (type === "Tracks") res = await searchTracksSpotify(q);
+      else if (type === "Artists") res = await searchArtistsSpotify(q);
 
       const list =
         type === "Albums"
-          ? res.albums
+          ? res?.albums
           : type === "Tracks"
-          ? res.tracks
-          : res.artists;
+          ? res?.tracks
+          : res?.artists;
 
-      setOverlayData(list || []);
+      setOverlayData(Array.isArray(list) ? list : []);
     } catch (e) {
       console.log("overlay error", e);
-    }
-
-    setOverlayLoading(false);
-  };
-
-  /* ===== CLOSE ===== */
-  const closeOverlay = () => {
-    Animated.timing(overlayAnim, {
-      toValue: SCREEN_WIDTH,
-      duration: 260,
-      useNativeDriver: true,
-    }).start(() => {
-      setOverlayType(null);
-      setOverlayQuery("");
       setOverlayData([]);
+    } finally {
       setOverlayLoading(false);
-    });
+    }
   };
 
   return {

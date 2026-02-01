@@ -86,11 +86,11 @@ export default function PopularCarousel({
                         {
                           color:
                             item.rank === 1
-                              ? COLORS.gold
+                              ? COLORS.text
                               : item.rank === 2
-                              ? COLORS.silver
+                              ? COLORS.text
                               : item.rank === 3
-                              ? COLORS.bronze
+                              ? COLORS.text
                               : COLORS.text,
                         },
                       ]}

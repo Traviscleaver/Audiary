@@ -1,34 +1,31 @@
-// NestedDetailOverlay.jsx
-// Slide-in overlay used when a track is tapped from inside an album detail screen.
-// Reuses the same header + detail content components, but disables album tracklist behavior.
-
+// app/shared/components/search/overlays/NestedDetailOverlay.jsx
 import React from "react";
-import { Animated, COLORS, PanResponder } from "../../imports";
+import { Animated, COLORS, Dimensions, PanResponder } from "../../../imports";
 
 import DetailContent from "./DetailContent";
 import DetailHeader from "./DetailHeader";
 
-export default function NestedDetailOverlay({
-  open,
-  setOpen,
-  detailType,
-  detailItem,
-}) {
-  const SCREEN_WIDTH = 1000; // overwritten in Home.jsx at runtime
-  const anim = new Animated.Value(SCREEN_WIDTH);
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
+export default function NestedDetailOverlay({ open, setOpen, detailType, detailItem }) {
+  const anim = React.useRef(new Animated.Value(SCREEN_WIDTH)).current;
   const scrollRef = React.useRef(null);
 
-  // ===== SWIPE-TO-CLOSE =====
+  const close = React.useCallback(() => {
+    Animated.timing(anim, {
+      toValue: SCREEN_WIDTH,
+      duration: 260,
+      useNativeDriver: true,
+    }).start(() => setOpen(false));
+  }, [anim, setOpen]);
+
   const panResponder = React.useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
         g.dx > 20 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
-
       onPanResponderMove: (_, g) => {
         if (g.dx > 0) anim.setValue(g.dx);
       },
-
       onPanResponderRelease: (_, g) => {
         if (g.dx > SCREEN_WIDTH / 3) close();
         else {
@@ -42,58 +39,40 @@ export default function NestedDetailOverlay({
     })
   ).current;
 
-  // ===== OPEN ANIMATION =====
   React.useEffect(() => {
-    if (open) {
-      anim.setValue(SCREEN_WIDTH);
-      Animated.timing(anim, {
-        toValue: 0,
-        duration: 260,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [open]);
-
-  // ===== CLOSE =====
-  const close = () => {
+    if (!open) return;
+    anim.setValue(SCREEN_WIDTH);
     Animated.timing(anim, {
-      toValue: SCREEN_WIDTH,
+      toValue: 0,
       duration: 260,
       useNativeDriver: true,
-    }).start(() => {
-      setOpen(false);
-    });
-  };
+    }).start();
+  }, [open, anim]);
 
   if (!open) return null;
+
+  const title =
+    detailType === "Tracks"
+      ? "Track"
+      : detailType === "Albums"
+      ? "Album"
+      : "Artist";
 
   return (
     <Animated.View
       {...panResponder.panHandlers}
       style={[
         styles.overlay,
-        {
-          transform: [{ translateX: anim }],
-          backgroundColor: COLORS.screen,
-        },
+        { transform: [{ translateX: anim }], backgroundColor: COLORS.screen },
       ]}
     >
-      <DetailHeader
-        title={
-          detailType === "Tracks"
-            ? "Track"
-            : detailType === "Albums"
-            ? "Album"
-            : "Artist"
-        }
-        onBack={close}
-      />
+      <DetailHeader title={title} onBack={close} />
 
       <DetailContent
         type={detailType}
         item={detailItem}
         loading={false}
-        tracks={[]} // no tracks inside nested detail
+        tracks={[]}
         showAll={false}
         setShowAll={() => {}}
         scrollRef={scrollRef}

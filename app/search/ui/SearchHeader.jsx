@@ -1,3 +1,4 @@
+// app/search/ui/SearchHeader.jsx
 import {
   COLORS,
   Feather,
@@ -16,23 +17,27 @@ export default function SearchHeader({
   openSearchOverlay,
   closeSearchOverlay,
   searchInputRef,
+  placeholder,
 }) {
   return (
     <>
-      {/* notch bg */}
       <View style={[styles.notchBg, { height: insetsTop }]} />
 
-      {/* navbar */}
       <View style={[styles.navbar, { paddingTop: insetsTop + 8 }]}>
-        <Text style={styles.title}>Audiary</Text>
+
 
         <View style={styles.searchRow}>
           <View style={styles.searchPill}>
-            <Feather name="search" size={18} color={COLORS.subtext} style={{ marginRight: 6 }} />
+            <Feather
+              name="search"
+              size={18}
+              color={COLORS.subtext}
+              style={{ marginRight: 6 }}
+            />
 
             <TextInput
               ref={searchInputRef}
-              placeholder="Search for music"
+              placeholder={placeholder || "Search"}
               placeholderTextColor={COLORS.subtext}
               value={query}
               onChangeText={setQuery}
@@ -50,7 +55,10 @@ export default function SearchHeader({
           </View>
 
           {searchOpen && (
-            <TouchableOpacity onPress={closeSearchOverlay} style={{ paddingLeft: 10 }}>
+            <TouchableOpacity
+              onPress={closeSearchOverlay}
+              style={{ paddingLeft: 10 }}
+            >
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
           )}

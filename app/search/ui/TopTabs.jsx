@@ -14,7 +14,7 @@ export default function TopTabs({ activeTab, setActiveTab }) {
   }, [activeTab, tabsWidth]);
 
   return (
-    <View style={{ backgroundColor: COLORS.navbar }}>
+    <View style={{ backgroundColor: COLORS.screen }}>
       <View
         onLayout={(e) => setTabsWidth(e.nativeEvent.layout.width)}
         style={{

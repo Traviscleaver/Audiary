@@ -9,11 +9,11 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 9999,
-    backgroundColor: COLORS.navbar,
+    backgroundColor: COLORS.screen,
   },
 
   navbar: {
-    backgroundColor: COLORS.navbar,
+    backgroundColor: COLORS.screen,
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
@@ -31,7 +31,7 @@ export const styles = StyleSheet.create({
   searchPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.screen,
+    backgroundColor: "#202020ff",
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,

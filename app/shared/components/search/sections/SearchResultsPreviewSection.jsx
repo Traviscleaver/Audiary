@@ -1,19 +1,15 @@
-// SearchResultsPreviewSection.jsx
-// Small titled section used on the search/home screen to preview results (albums/tracks/artists).
-// Renders a short list of rows plus a "View all..." action.
-
 import { FlatList, Text, TouchableOpacity, View } from "react-native";
-import { COLORS } from "../../imports";
-import SearchResultRow from "./SearchResultRow";
+import { COLORS } from "../../../imports";
+import SearchResultRow from "../rows/SearchResultRow";
 
 export default function SearchResultsPreviewSection({
   title,
   data,
-  type,
+  type,       // must be: "Albums" | "Tracks" | "Artists"
   onOpen,
   onViewAll,
 }) {
-  if (!data || data.length === 0) return null;
+  if (!Array.isArray(data) || data.length === 0) return null;
 
   return (
     <View style={{ marginBottom: 28 }}>
@@ -31,6 +27,7 @@ export default function SearchResultsPreviewSection({
       <FlatList
         data={data}
         keyExtractor={(i) => String(i.id)}
+        scrollEnabled={false}
         renderItem={({ item }) => (
           <SearchResultRow
             item={item}
@@ -38,10 +35,13 @@ export default function SearchResultsPreviewSection({
             onPress={() => onOpen(item, type)}
           />
         )}
-        scrollEnabled={false}
       />
 
-      <TouchableOpacity onPress={() => onViewAll(type)} style={{ marginTop: 10 }}>
+      <TouchableOpacity
+        onPress={() => onViewAll(type)}
+        activeOpacity={0.8}
+        style={{ marginTop: 10 }}
+      >
         <Text style={{ color: COLORS.subtext, fontSize: 14 }}>
           View all {title.toLowerCase()}...
         </Text>

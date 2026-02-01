@@ -4,10 +4,12 @@ export const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.screen },
 
   header:{
-    backgroundColor: COLORS.navbar,
+    backgroundColor: COLORS.screen,
     paddingHorizontal: 16,
     paddingBottom: 12,
     alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
   },
   appTitle: {
     color: COLORS.text,
@@ -17,26 +19,35 @@ export const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
-  searchBarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.screen,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    width: "100%",
-  },
-  searchInput: {
+  gridBtnStyle: {
     flex: 1,
-    fontSize: 15,
-    paddingVertical: 6,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffadadff",
+  },
+
+  gridBtnTextStyle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  homeSectionTitle: {
     color: COLORS.text,
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 12,
   },
 
   scroll: { flex: 1 },
 
   sectionHeaderRow: {
-    marginTop: 18,
+    marginTop: 7,
     paddingHorizontal: 16,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -45,7 +56,7 @@ export const styles = StyleSheet.create({
   sectionTitle: { color: COLORS.text, fontSize: 20, fontWeight: "700" },
 
   sectionTabsRow: { flexDirection: "row", alignItems: "center" },
-  sectionTabLabel: { color: COLORS.subtext, fontSize: 12, fontWeight: "600" },
+  sectionTabLabel: { color: COLORS.subtext, fontSize: 14, fontWeight: "600" },
   sectionTabLabelActive: { color: COLORS.active },
   sectionTabSlash: { color: COLORS.subtext, marginHorizontal: 4, fontSize: 12 },
 
@@ -58,7 +69,7 @@ export const styles = StyleSheet.create({
   albumCoverWrap: {
     width: "100%",
     aspectRatio: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#1f1f1f",
     position: "relative",
@@ -89,25 +100,6 @@ export const styles = StyleSheet.create({
   },
   rankText: { fontSize: 10, fontWeight: "700" },
 
-  searchOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: COLORS.screen,
-    zIndex: 999,
-  },
-
-  fullOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: COLORS.screen,
-    zIndex: 9099,
-  },
 
   centerLoader: {
     flex: 1,
@@ -121,6 +113,6 @@ export const styles = StyleSheet.create({
     top: 0,
     left: 0,
     zIndex: 9999,
-    backgroundColor: COLORS.navbar,
+    backgroundColor: COLORS.screen,
   },
 });
