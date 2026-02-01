@@ -44,6 +44,47 @@ export const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  popularGridContent: {
+  paddingHorizontal: 14,
+  paddingTop: 6,
+  paddingBottom: 6,
+},
+
+popularGridRow: {
+  justifyContent: "space-between",
+},
+
+popularGridItem: {
+  width: "32%",          // 3 across with some spacing
+  marginBottom: 14,
+},
+
+popularGridCoverWrap: {
+  width: "100%",
+  aspectRatio: 1,        // make it square; change to 2/3 for poster style
+  borderRadius: 12,
+  overflow: "hidden",
+},
+
+popularGridImage: {
+  width: "100%",
+  height: "100%",
+  borderRadius: 12,
+},
+
+popularGridTitle: {
+  marginTop: 6,
+  color: COLORS.text,
+  fontSize: 12,
+},
+
+popularGridArtist: {
+  marginTop: 2,
+  color: COLORS.subtext,
+  fontSize: 11,
+},
+
+
   scroll: { flex: 1 },
 
   sectionHeaderRow: {
@@ -53,7 +94,7 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  sectionTitle: { color: COLORS.text, fontSize: 20, fontWeight: "700" },
+  sectionTitle: { color: COLORS.text, fontSize: 23, fontWeight: "700" },
 
   sectionTabsRow: { flexDirection: "row", alignItems: "center" },
   sectionTabLabel: { color: COLORS.subtext, fontSize: 14, fontWeight: "600" },

@@ -18,6 +18,7 @@ export default function PopularCarousel({
   tracks,
   loadingAlbums,
   loadingTracks,
+  onOpenDetail, // ✅ new
 }) {
   const { items, loading } = getPopularSectionState({
     tab,
@@ -27,16 +28,22 @@ export default function PopularCarousel({
     loadingTracks,
   });
 
+  const detailType = tab === ALBUMS_TAB ? "Albums" : "Tracks";
 
   return (
     <>
       {/* Popular Section Header */}
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Popular This Week</Text>
+        <Text style={styles.sectionTitle}>Top of the charts</Text>
 
         <View style={styles.sectionTabsRow}>
           <TouchableOpacity onPress={() => setTab(ALBUMS_TAB)}>
-            <Text style={[styles.sectionTabLabel, tab === ALBUMS_TAB && styles.sectionTabLabelActive]}>
+            <Text
+              style={[
+                styles.sectionTabLabel,
+                tab === ALBUMS_TAB && styles.sectionTabLabelActive,
+              ]}
+            >
               ALBUMS
             </Text>
           </TouchableOpacity>
@@ -44,14 +51,19 @@ export default function PopularCarousel({
           <Text style={styles.sectionTabSlash}> / </Text>
 
           <TouchableOpacity onPress={() => setTab(TRACKS_TAB)}>
-            <Text style={[styles.sectionTabLabel, tab === TRACKS_TAB && styles.sectionTabLabelActive]}>
+            <Text
+              style={[
+                styles.sectionTabLabel,
+                tab === TRACKS_TAB && styles.sectionTabLabelActive,
+              ]}
+            >
               TRACKS
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Carousel */}
+      {/* Grid */}
       {loading ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" />
@@ -61,15 +73,24 @@ export default function PopularCarousel({
       ) : (
         <FlatList
           data={items}
-          horizontal
           keyExtractor={(i) => i.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.carouselContent}
+          numColumns={3}
+          scrollEnabled={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.popularGridContent}
+          columnWrapperStyle={styles.popularGridRow}
           renderItem={({ item }) => (
-            <View style={styles.albumCard}>
-              <View style={styles.albumCoverWrap}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={styles.popularGridItem}
+              onPress={() => onOpenDetail?.(detailType, item)} // ✅ open overlay
+            >
+              <View style={styles.popularGridCoverWrap}>
                 {item.coverUrl ? (
-                  <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
+                  <Image
+                    source={{ uri: item.coverUrl }}
+                    style={styles.popularGridImage}
+                  />
                 ) : (
                   <View style={styles.albumPlaceholder}>
                     <Text style={styles.albumPlaceholderText}>
@@ -77,40 +98,33 @@ export default function PopularCarousel({
                     </Text>
                   </View>
                 )}
+              </View>
 
-                {item.rank && (
+                {!!item.rank && (
                   <View style={styles.rankBubble}>
-                    <Text
-                      style={[
-                        styles.rankText,
-                        {
-                          color:
-                            item.rank === 1
-                              ? COLORS.text
-                              : item.rank === 2
-                              ? COLORS.text
-                              : item.rank === 3
-                              ? COLORS.text
-                              : COLORS.text,
-                        },
-                      ]}
-                    >
+                    <Text style={[styles.rankText, { color: COLORS.text }]}>
                       {item.rank}
                     </Text>
                   </View>
                 )}
-              </View>
 
-              <Text style={styles.albumTitle} numberOfLines={2}>
+              <Text style={styles.popularGridTitle} numberOfLines={2}>
                 {item.title}
               </Text>
-              <Text style={styles.albumArtist} numberOfLines={1}>
+              <Text style={styles.popularGridArtist} numberOfLines={1}>
                 {item.artist}
               </Text>
-            </View>
+            </TouchableOpacity>
           )}
         />
       )}
     </>
   );
 }
+
+
+
+
+
+
+
