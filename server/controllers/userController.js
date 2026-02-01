@@ -238,6 +238,9 @@ exports.getUserDiary = async (req, res) => {
 // =======================================
 // GET /users/:username/favorites
 // =======================================
+// =======================================
+// GET /users/:username/favorites (HYDRATED)
+// =======================================
 exports.getUserFavorites = async (req, res) => {
   try {
     const username = req.params.username;
@@ -246,10 +249,40 @@ exports.getUserFavorites = async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT item_type, item_id, added_at
-      FROM favorites
-      WHERE user_id = $1
-      ORDER BY added_at DESC
+      SELECT
+        f.item_type,
+        f.item_id,
+        f.added_at,
+
+        -- unified display fields
+        COALESCE(s.title, al.title, ar.name) AS title,
+
+        -- image to display
+        COALESCE(al.cover_url, ar.image_url) AS image_url,
+
+        -- optional subtitle (artist name)
+        COALESCE(ar2.name, ar.name) AS subtitle
+
+      FROM favorites f
+
+      -- SONG favorite: join song -> album -> artist
+      LEFT JOIN songs s
+        ON f.item_type = 'song' AND s.song_id = f.item_id
+      LEFT JOIN albums al
+        ON (
+          (f.item_type = 'album' AND al.album_id = f.item_id)
+          OR
+          (f.item_type = 'song' AND al.album_id = s.album_id)
+        )
+      LEFT JOIN artists ar
+        ON (f.item_type = 'artist' AND ar.artist_id = f.item_id)
+
+      -- artist for album/song (separate alias so we can subtitle songs/albums)
+      LEFT JOIN artists ar2
+        ON (al.artist_id = ar2.artist_id)
+
+      WHERE f.user_id = $1
+      ORDER BY f.added_at DESC
       `,
       [user.user_id]
     );

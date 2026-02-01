@@ -4,6 +4,11 @@ const dotenv = require("dotenv");
 
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/user");
+
+const songRoutes = require("./routes/songs");
+const albumRoutes = require("./routes/albums");
+const artistRoutes = require("./routes/artists");
+
 const { pool } = require("./db");
 
 dotenv.config();
@@ -16,6 +21,10 @@ app.use(express.json());
 // ===== ROUTES =====
 app.use("/auth", authRoutes);
 app.use("/", userRoutes);
+
+app.use("/", songRoutes);
+app.use("/", albumRoutes);
+app.use("/", artistRoutes);
 
 // ===== DB TEST ROUTE =====
 app.get("/db-test", async (req, res) => {

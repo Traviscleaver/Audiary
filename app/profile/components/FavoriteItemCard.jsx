@@ -1,29 +1,19 @@
-import { useEffect, useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
-import {
-  getAlbumByIdSpotify,
-  getArtistByIdSpotify,
-  getSongByIdSpotify,
-} from "../../../api/spotify";
 import { COLORS, SIZES } from "../../shared/imports";
 
-export default function FavoriteItemCard({ type, id }) {
-  const [data, setData] = useState(null);
+/**
+ * Hydrated favorite item:
+ * item = {
+ *   item_type, item_id, added_at,
+ *   title, image_url, subtitle
+ * }
+ */
+export default function FavoriteItemCard({ item }) {
+  const title = item?.title || "Untitled";
+  const imageUrl = item?.image_url || "https://placehold.co/200x200";
+  const subtitle = item?.subtitle || null;
 
-  useEffect(() => {
-    async function load() {
-      try {
-        if (type === "album") setData(await getAlbumByIdSpotify(id));
-        if (type === "song") setData(await getSongByIdSpotify(id));
-        if (type === "artist") setData(await getArtistByIdSpotify(id));
-      } catch (err) {
-        console.log("FavoriteItemCard error:", err);
-      }
-    }
-    load();
-  }, [id]);
-
-  if (!data) {
+  if (!item) {
     return (
       <View
         style={{
@@ -40,13 +30,12 @@ export default function FavoriteItemCard({ type, id }) {
   return (
     <TouchableOpacity style={{ marginRight: 12 }}>
       <Image
-        source={{
-          uri: data.coverUrl || data.imageUrl || "https://placehold.co/200x200",
-        }}
+        source={{ uri: imageUrl }}
         style={{
           width: SIZES.cover,
           height: SIZES.cover,
           borderRadius: 8,
+          backgroundColor: COLORS.card,
         }}
       />
 
@@ -59,8 +48,22 @@ export default function FavoriteItemCard({ type, id }) {
           width: SIZES.cover,
         }}
       >
-        {data.title || data.name}
+        {title}
       </Text>
+
+      {!!subtitle && (
+        <Text
+          numberOfLines={1}
+          style={{
+            color: COLORS.subtext,
+            marginTop: 2,
+            fontSize: 12,
+            width: SIZES.cover,
+          }}
+        >
+          {subtitle}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }

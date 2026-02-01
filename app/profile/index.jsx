@@ -1,6 +1,9 @@
 // profile.jsx
 import useProfileData from "./hooks/useProfileData";
 import useProfileOverlays from "./hooks/useProfileOverlays";
+import useFavouriteData from "./hooks/useFavouriteData";
+
+import { RefreshControl } from "react-native";
 
 import {
   COLORS,
@@ -23,34 +26,53 @@ import {
 
 import AuthGate from "../shared/components/AuthGate.jsx";
 import FooterBar from "../shared/components/FooterBar.jsx";
-import BioOverlay from "./components/BioOverlay.jsx";
-import EmailOverlay from "./components/EmailOverlay.jsx";
 import FavoriteItemCard from "./components/FavoriteItemCard.jsx";
 import SettingsOverlay from "./components/SettingsOverlay.jsx";
-
 
 const TABS = ["Home", "Reviews", "Lists"];
 const AVATAR_SCALE = 1.5;
 
 export default function Profile() {
-
-
   const {
     status,
     profile,
     loadingExtra,
     stats,
-    favourites,
     playlists,
     reviews,
     ratings,
     diary,
     activity,
+    // refresh, // (optional) if you want pull-to-refresh to refresh everything
   } = useProfileData();
+
+  const {
+    favourites,
+    loadingFavourites,
+    refresh: refreshFavourites,
+    clearFavouritesCache,
+  } = useFavouriteData();
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const isGuest = status !== "logged-in";
+
+  // ===== Pull-to-refresh state (separate from loadingFavourites)
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // This bypasses cache in the hook (fresh pull from API)
+      await refreshFavourites();
+
+      // If you want to refresh the other profile datasets too:
+      // await refresh?.();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // ===== USER STATE =====
   const [handle, setHandle] = useState("");
@@ -62,43 +84,24 @@ export default function Profile() {
   const [website, setWebsite] = useState("");
   const [pronoun, setPronoun] = useState("He / his");
 
-  // const [loadingExtra, setLoadingExtra] = useState(false);
-  
   // For your Settings UI
   const [givenName, setGivenName] = useState("");
   const [familyName, setFamilyName] = useState("");
 
   const [activeTab, setActiveTab] = useState("Home");
 
-  const showFavPlaceholders = loadingExtra && favourites.length === 0;
-
-
-
   const {
     settingsOpen,
-    bioOverlayOpen,
-    emailOverlayOpen,
     settingsAnim,
-    subAnim,
     openSettings,
     closeSettings,
     openBioOverlay,
-    closeBioOverlay,
     openEmailOverlay,
-    closeEmailOverlay,
   } = useProfileOverlays();
-
-
-
-
-
 
   // ===== Hydrate local UI fields from profile (when profile changes) =====
   useEffect(() => {
-    if (!profile) {
-      console.log("No profile to load into UI fields.");
-      return;
-    }
+    if (!profile) return;
 
     setHandle(profile.username || "");
     setEmail(profile.email || "");
@@ -116,22 +119,18 @@ export default function Profile() {
       setGivenName("");
       setFamilyName("");
     }
-
   }, [profile]);
 
   const [favouriteAlbums, setFavouriteAlbums] = useState([]);
   const [favouriteSongs, setFavouriteSongs] = useState([]);
   const [favouriteArtists, setFavouriteArtists] = useState([]);
 
-  // Filtered favorites
+  // Filter favourites by type
   useEffect(() => {
-    setFavouriteAlbums(favourites.filter(f => f.item_type === "album"));
-    setFavouriteSongs(favourites.filter(f => f.item_type === "song"));
-    setFavouriteArtists(favourites.filter(f => f.item_type === "artist"));
-    // setLoadingExtra(false);
-  } , [favourites]);
-
-
+    setFavouriteAlbums(favourites.filter((f) => f.item_type === "album"));
+    setFavouriteSongs(favourites.filter((f) => f.item_type === "song"));
+    setFavouriteArtists(favourites.filter((f) => f.item_type === "artist"));
+  }, [favourites]);
 
   const PlaceholderSlider = memo(function PlaceholderSlider({ count, type }) {
     const arr = Array.from({ length: count }).map((_, i) => ({
@@ -156,176 +155,184 @@ export default function Profile() {
     );
   });
 
-  // if (!profile) return <Text style={{ color: COLORS.text }}>Loading profile...</Text>;
+  // ✅ Only show placeholders when we have nothing yet
+  const showFavLoading = (loadingFavourites || loadingExtra) && favourites.length === 0;
 
-const isGuest = status !== "logged-in";
+  return (
+    <AuthGate mode="onEnter" onCancel="back" message="Log in to view your profile.">
+      <SafeAreaView style={[styles.safe, { paddingTop: 0 }]}>
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={loadingFavourites}
+              onRefresh={refreshFavourites}
+              tintColor={COLORS.text} // iOS
+            />
+          }
+        >
+          <View style={[styles.topRightActions, { top: 25 }]}>
+            <TouchableOpacity style={styles.iconBtn}>
+              <Feather name="share-2" size={20} color={COLORS.text} />
+            </TouchableOpacity>
 
-return (
-  <AuthGate
-    mode="onEnter"
-    onCancel="back"
-    message="Log in to view your profile."
-  >
-    <SafeAreaView style={[styles.safe, { paddingTop: 0 }]}>
-      <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.topRightActions, { top: 25 }]}>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Feather name="share-2" size={20} color={COLORS.text} />
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={openSettings}>
+              <Feather name="more-horizontal" size={22} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity style={styles.iconBtn} onPress={openSettings}>
-            <Feather name="more-horizontal" size={22} color={COLORS.text} />
-          </TouchableOpacity>
-        </View>
-
-        {/* HEADER */}
-        <View style={styles.headerWrap}>
-          <View style={styles.headerRow}>
-            <View style={styles.leftCol}>
-              <View style={styles.avatar}>
-                {!isGuest && avatarUrl ? (
-                  <Image
-                    source={{ uri: avatarUrl }}
-                    style={{ width: "100%", height: "100%", borderRadius: 999 }}
-                  />
-                ) : (
-                  <Feather name="user" size={48} color={COLORS.subtext} />
-                )}
+          {/* HEADER */}
+          <View style={styles.headerWrap}>
+            <View style={styles.headerRow}>
+              <View style={styles.leftCol}>
+                <View style={styles.avatar}>
+                  {!isGuest && avatarUrl ? (
+                    <Image
+                      source={{ uri: avatarUrl }}
+                      style={{ width: "100%", height: "100%", borderRadius: 999 }}
+                    />
+                  ) : (
+                    <Feather name="user" size={48} color={COLORS.subtext} />
+                  )}
+                </View>
               </View>
-            </View>
 
-            <View style={styles.rightCol}>
-              <View style={styles.centeredRightBlock}>
-                <Text style={styles.nameBig}>
-                  {isGuest ? "Guest" : (displayName || handle || "User")}
-                </Text>
+              <View style={styles.rightCol}>
+                <View style={styles.centeredRightBlock}>
+                  <Text style={styles.nameBig}>
+                    {isGuest ? "Guest" : displayName || handle || "User"}
+                  </Text>
 
-                <View style={styles.inlineRow}>
-                  <InlineStat count={isGuest ? 0 : (stats.total_reviews || 0)} label="reviews" />
-                  <InlineStat count={isGuest ? 0 : (stats.total_ratings || 0)} label="ratings" />
-                  <InlineStat count={isGuest ? 0 : (stats.total_songs_listened || 0)} label="listens" />
+                  <View style={styles.inlineRow}>
+                    <InlineStat count={isGuest ? 0 : stats.total_reviews || 0} label="reviews" />
+                    <InlineStat count={isGuest ? 0 : stats.total_ratings || 0} label="ratings" />
+                    <InlineStat count={isGuest ? 0 : stats.total_songs_listened || 0} label="listens" />
+                  </View>
                 </View>
               </View>
             </View>
           </View>
-        </View>
 
-        {/* TABS */}
-        <View style={styles.tabsBar}>
-          {TABS.map((t) => (
-            <Tab key={t} label={t} active={activeTab === t} onPress={() => setActiveTab(t)} />
-          ))}
-        </View>
+          {/* TABS */}
+          <View style={styles.tabsBar}>
+            {TABS.map((t) => (
+              <Tab key={t} label={t} active={activeTab === t} onPress={() => setActiveTab(t)} />
+            ))}
+          </View>
 
-        {/* HOME */}
-        {activeTab === "Home" && (
-          <>
-            <Section title="Favourite Albums">
-              {(isGuest || loadingExtra) ? (
-                <PlaceholderSlider type="album" count={10} />
-              ) : (
-                <FlatList
-                  horizontal
-                  data={favouriteAlbums}
-                  keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
-                  renderItem={({ item }) => <FavoriteItemCard type="album" id={item.item_id} />}
-                  contentContainerStyle={styles.sliderContent}
-                  showsHorizontalScrollIndicator={false}
-                />
-              )}
-            </Section>
+          {/* HOME */}
+          {activeTab === "Home" && (
+            <>
+              <Section title="Favourite Albums">
+                {isGuest || showFavLoading ? (
+                  <PlaceholderSlider type="album" count={10} />
+                ) : (
+                  <FlatList
+                    horizontal
+                    data={favouriteAlbums}
+                    keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                    // ✅ pass full item so card can use image_url/title later
+                    // renderItem={({ item }) => <FavoriteItemCard type="album" item={item} />}
+                    renderItem={({ item }) => <FavoriteItemCard item={item} />}
+                    contentContainerStyle={styles.sliderContent}
+                    showsHorizontalScrollIndicator={false}
+                  />
+                )}
+              </Section>
 
-            <Section title="Favourite Songs">
-              {(isGuest || loadingExtra) ? (
-                <PlaceholderSlider type="song" count={10} />
-              ) : (
-                <FlatList
-                  horizontal
-                  data={favouriteSongs}
-                  keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
-                  renderItem={({ item }) => <FavoriteItemCard type="song" id={item.item_id} />}
-                  contentContainerStyle={styles.sliderContent}
-                  showsHorizontalScrollIndicator={false}
-                />
-              )}
-            </Section>
+              <Section title="Favourite Songs">
+                {isGuest || showFavLoading ? (
+                  <PlaceholderSlider type="song" count={10} />
+                ) : (
+                  <FlatList
+                    horizontal
+                    data={favouriteSongs}
+                    keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                    // renderItem={({ item }) => <FavoriteItemCard type="song" item={item} />}
+                    renderItem={({ item }) => <FavoriteItemCard item={item} />}
+                    contentContainerStyle={styles.sliderContent}
+                    showsHorizontalScrollIndicator={false}
+                  />
+                )}
+              </Section>
 
-            <Section title="Favourite Artists">
-              {(isGuest || loadingExtra) ? (
-                <PlaceholderSlider type="artist" count={10} />
-              ) : (
-                <FlatList
-                  horizontal
-                  data={favouriteArtists}
-                  keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
-                  renderItem={({ item }) => <FavoriteItemCard type="artist" id={item.item_id} />}
-                  contentContainerStyle={styles.sliderContent}
-                  showsHorizontalScrollIndicator={false}
-                />
-              )}
-            </Section>
+              <Section title="Favourite Artists">
+                {isGuest || showFavLoading ? (
+                  <PlaceholderSlider type="artist" count={10} />
+                ) : (
+                  <FlatList
+                    horizontal
+                    data={favouriteArtists}
+                    keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
+                    // renderItem={({ item }) => <FavoriteItemCard type="artist" item={item} />}
+                    renderItem={({ item }) => <FavoriteItemCard item={item} />}
+                    contentContainerStyle={styles.sliderContent}
+                    showsHorizontalScrollIndicator={false}
+                  />
+                )}
+              </Section>
 
-            <Section title="Recent Activity" bottomMargin>
-              {isGuest ? (
-                <View style={styles.emptyWrap}>
-                  <Text style={styles.placeholderText}>Log in to see activity.</Text>
-                </View>
-              ) : activity.length === 0 ? (
-                <View style={styles.emptyWrap}>
-                  <Text style={styles.placeholderText}>No activity yet.</Text>
-                </View>
-              ) : (
-                activity.map((a) => (
-                  <View key={a.activity_id} style={{ padding: 12 }}>
-                    <Text style={{ color: COLORS.text }}>{a.type} → {a.description}</Text>
-                    <Text style={{ color: COLORS.subtext, fontSize: 12 }}>
-                      {new Date(a.created_at).toLocaleString()}
-                    </Text>
+              <Section title="Recent Activity" bottomMargin>
+                {isGuest ? (
+                  <View style={styles.emptyWrap}>
+                    <Text style={styles.placeholderText}>Log in to see activity.</Text>
                   </View>
-                ))
-              )}
-            </Section>
-          </>
+                ) : activity.length === 0 ? (
+                  <View style={styles.emptyWrap}>
+                    <Text style={styles.placeholderText}>No activity yet.</Text>
+                  </View>
+                ) : (
+                  activity.map((a) => (
+                    <View key={a.activity_id} style={{ padding: 12 }}>
+                      <Text style={{ color: COLORS.text }}>
+                        {a.type} → {a.description}
+                      </Text>
+                      <Text style={{ color: COLORS.subtext, fontSize: 12 }}>
+                        {new Date(a.created_at).toLocaleString()}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </Section>
+            </>
+          )}
+        </ScrollView>
+
+        <FooterBar router={router} insets={insets} />
+
+        {!isGuest && settingsOpen && (
+          <SettingsOverlay
+            settingsAnim={settingsAnim}
+            closeSettings={closeSettings}
+            handle={handle}
+            setHandle={setHandle}
+            givenName={givenName}
+            setGivenName={setGivenName}
+            familyName={familyName}
+            setFamilyName={setFamilyName}
+            email={email}
+            location={location}
+            setLocation={setLocation}
+            website={website}
+            setWebsite={setWebsite}
+            pronoun={pronoun}
+            openBioOverlay={openBioOverlay}
+            openEmailOverlay={openEmailOverlay}
+            avatarUrl={avatarUrl}
+            setAvatarUrl={setAvatarUrl}
+            onSave={(user) => {
+              setHandle(user.username);
+              setEmail(user.email);
+              setDisplayName(user.display_name || "");
+              setBio(user.bio || "");
+              setAvatarUrl(user.avatar_url || "");
+            }}
+          />
         )}
-      </ScrollView>
-
-      <FooterBar router={router} insets={insets} />
-
-      {/* overlays only make sense when logged in */}
-      {!isGuest && settingsOpen && (
-        <SettingsOverlay
-          settingsAnim={settingsAnim}
-          closeSettings={closeSettings}
-          handle={handle}
-          setHandle={setHandle}
-          givenName={givenName}
-          setGivenName={setGivenName}
-          familyName={familyName}
-          setFamilyName={setFamilyName}
-          email={email}
-          location={location}
-          setLocation={setLocation}
-          website={website}
-          setWebsite={setWebsite}
-          pronoun={pronoun}
-          openBioOverlay={openBioOverlay}
-          openEmailOverlay={openEmailOverlay}
-          avatarUrl={avatarUrl}
-          setAvatarUrl={setAvatarUrl}
-          onSave={(user) => {
-            setHandle(user.username);
-            setEmail(user.email);
-            setDisplayName(user.display_name || "");
-            setBio(user.bio || "");
-            setAvatarUrl(user.avatar_url || "");
-          }}
-        />
-      )}
-    </SafeAreaView>
-  </AuthGate>
-);
-
-
+      </SafeAreaView>
+    </AuthGate>
+  );
 }
 
 /* ===================================================================
@@ -340,19 +347,6 @@ function InlineStat({ count, label }) {
     </View>
   );
 }
-// function FavoriteItemCard({ type, id }) {
-//   return (
-//     <View style={styles.sliderItem}>
-//       <View style={styles.cover} />
-//       <Text style={styles.coverTitle}>
-//         {type} {id}
-//       </Text>
-//     </View>
-//   );
-// }
-
-
-
 
 const Tab = memo(function Tab({ label, active, onPress }) {
   return (
@@ -375,7 +369,7 @@ const Section = ({ title, children, bottomMargin }) => (
 );
 
 /* ===================================================================
-   STYLES (UNCHANGED)
+   STYLES
    =================================================================== */
 
 const styles = StyleSheet.create({
@@ -383,13 +377,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   scrollContent: { paddingBottom: 40 },
 
-  // topRightActions: {
-  //   flexDirection: "row",
-  //   gap: 14,
-  //   alignSelf: "flex-end",
-  //   marginRight: 16,
-  //   marginTop: -10,
-  // },
   topRightActions: {
     position: "absolute",
     right: 16,
@@ -397,7 +384,6 @@ const styles = StyleSheet.create({
     gap: 14,
     zIndex: 9999,
   },
-
 
   iconBtn: {
     width: 36,
@@ -457,19 +443,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderRadius: SIZES.coverRadius,
   },
-  coverTitle: {
-    color: COLORS.text,
-    fontSize: 13,
-    marginTop: 8,
-    fontWeight: "700",
+
+  placeholderLine: {
+    height: 10,
+    borderRadius: 6,
+    backgroundColor: COLORS.card,
+    opacity: 0.7,
+    width: "80%",
   },
-
-  // placeholderLine: {
-  //   height: 10,
-  //   borderRadius: 6,
-  //   backgroundColor: COLORS.card, // or COLORS.divider if you have it
-  //   opacity: 0.7,
-  //   width: "80%",
-  // },
-
 });

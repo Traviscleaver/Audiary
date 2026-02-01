@@ -3,6 +3,7 @@ import { updateProfile } from "../../../lib/api";
 import { useAuth } from "../../../lib/AuthContext";
 // import {  onLogout } from "./LogoutButton"
 import { logout } from "../../shared/utils/logout";
+import useFavouriteData from "../hooks/useFavouriteData";
 import {
   Animated,
   COLORS,
@@ -43,6 +44,7 @@ export default function SettingsOverlay({
 }) {
   const router = useRouter();
   const { setAuthToken, setProfile } = useAuth();
+  const { setFavourites } = useFavouriteData();
 
   const handleSave = async () => {
     try {
@@ -150,7 +152,7 @@ export default function SettingsOverlay({
           </TouchableOpacity>
 
           {/* SIGN OUT */}
-          <TouchableOpacity style={styles.rowTouchable} onPress={() => logout(setAuthToken, setProfile)}>
+          <TouchableOpacity style={styles.rowTouchable} onPress={() => logout(setAuthToken, setProfile, setFavourites)}>
             <Text style={[styles.editLabel, { color: COLORS.danger }]}>
               Sign out
             </Text>

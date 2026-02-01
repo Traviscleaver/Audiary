@@ -21,7 +21,6 @@ export default function useProfileData() {
   const [error, setError] = useState(null);
 
   const [stats, setStats] = useState({});
-  const [favourites, setFavourites] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [ratings, setRatings] = useState([]);
@@ -71,7 +70,6 @@ export default function useProfileData() {
 
         const [
           statsRes,
-          favRes,
           reviewsRes,
           ratingsRes,
           playlistsRes,
@@ -79,7 +77,6 @@ export default function useProfileData() {
           activityRes,
         ] = await Promise.all([
           getMyStats(username),
-          api(`/users/${username}/favorites`),
           api(`/users/${username}/reviews`),
           api(`/users/${username}/ratings`),
           api(`/users/${username}/playlists`),
@@ -90,7 +87,6 @@ export default function useProfileData() {
         if (cancelled) return;
 
         setStats(statsRes.stats || {});
-        setFavourites(favRes.favorites || []);
         setReviews(reviewsRes.reviews || []);
         setRatings(ratingsRes.ratings || []);
         setPlaylists(playlistsRes.playlists || []);
@@ -167,7 +163,6 @@ return {
   error,
 
   stats,
-  favourites,
   playlists,
   reviews,
   ratings,
