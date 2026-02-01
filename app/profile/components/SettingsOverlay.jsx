@@ -43,7 +43,7 @@ export default function SettingsOverlay({
   onSave,
 }) {
   const router = useRouter();
-  const { setAuthToken, setProfile } = useAuth();
+  const { setAuthToken } = useAuth();
   const { setFavourites } = useFavouriteData();
 
   const handleSave = async () => {
@@ -152,7 +152,7 @@ export default function SettingsOverlay({
           </TouchableOpacity>
 
           {/* SIGN OUT */}
-          <TouchableOpacity style={styles.rowTouchable} onPress={() => logout(setAuthToken, setProfile, setFavourites)}>
+          <TouchableOpacity style={styles.rowTouchable} onPress={() => logout(setAuthToken, setFavourites)}>
             <Text style={[styles.editLabel, { color: COLORS.danger }]}>
               Sign out
             </Text>

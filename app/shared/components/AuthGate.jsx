@@ -9,7 +9,6 @@ export default function AuthGate({
   mode = "onEnter", // "onEnter" | "onAction"
   title = "Login required",
   message = "You need an account to use this feature.",
-  loginRoute = "/(auth)/LoginScreen",
   onCancel = "back", // "back" | "stay"
 }) {
   const router = useRouter();
@@ -39,13 +38,13 @@ export default function AuthGate({
     if (onCancel === "back") {
       // go back to previous page
       if (router.canGoBack?.()) router.back();
-      else router.replace("/"); // fallback if no history
+      else router.replace("/LoginScreen"); // fallback if no history
     }
   };
 
   const handleLogin = () => {
     setVisible(false);
-    router.push(loginRoute);
+    router.replace('/LoginScreen');
   };
 
   // If mode is onEnter, just render children normally (page exists, modal blocks)
