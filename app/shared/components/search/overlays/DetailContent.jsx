@@ -12,6 +12,10 @@ import {
   TouchableOpacity,
   View,
 } from "../../../imports";
+import { ensureAlbum, ensureArtist, ensureTrack, favouritesExistsBySpotify  } from "../../../../../lib/api";
+import { Alert } from "react-native";
+import FavoriteButton from "../../favouriteButton";
+import React, { useEffect, useRef, useState } from "react";
 
 export default function DetailContent({
   type,
@@ -37,6 +41,87 @@ export default function DetailContent({
   const subtitle = type === "Artists" ? "" : item.artist || item.album;
 
   const canOpenTrack = typeof openSubDetail === "function";
+  const spotifyId = item.id || null;
+
+  const [initialFavorite, setInitialFavorite] = useState(false);
+  const [favDbId, setFavDbId] = useState(null);
+
+  // small in-memory cache so it doesn't spam when rerendering
+  const existsCacheRef = useRef(new Map()); // key -> { exists, item_id, at }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadExists() {
+      if (!spotifyId) return;
+
+      const key = `${type}::${spotifyId}`;
+      const cached = existsCacheRef.current.get(key);
+
+      // cache for 60 seconds to avoid repeated calls while navigating/scrolling
+      if (cached && Date.now() - cached.at < 60_000) {
+        setInitialFavorite(!!cached.exists);
+        setFavDbId(cached.item_id ?? null);
+        return;
+      }
+
+      try {
+        const res = await favouritesExistsBySpotify(type, spotifyId);
+        if (cancelled) return;
+
+        existsCacheRef.current.set(key, { ...res, at: Date.now() });
+        setInitialFavorite(!!res.exists);
+        setFavDbId(res.item_id ?? null);
+      } catch (e) {
+        if (cancelled) return;
+        // don't block UI if this fails
+        setInitialFavorite(false);
+        setFavDbId(null);
+      }
+    }
+
+    loadExists();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [type, spotifyId]);
+
+
+  const onRatePress = async () => {
+    try {
+      if (!spotifyId) return;
+
+      // Tracks → ensure song+album+artist
+      if (type === "Tracks") {
+        const res = await ensureTrack(spotifyId);
+
+        // res example: { song_id, album_id, artist_id, existed }
+        Alert.alert(
+          "Saved to database ✅",
+          `Song ID: ${res.song_id}\n${res.existed ? "Already existed" : "Imported from Spotify"}`
+        );
+        return;
+      }
+
+      // Albums → ensure album+artist only (no songs)
+      if (type === "Albums") {
+        const res = await ensureAlbum(spotifyId);
+
+        Alert.alert(
+          "Saved to database ✅",
+          `Album ID: ${res.album_id}\n${res.existed ? "Already existed" : "Imported from Spotify"}`
+        );
+        return;
+      }
+
+      // Artists (for now) — just tell them it’s not wired
+      Alert.alert("Not ready yet", "Artist import not wired yet.");
+    } catch (err) {
+      console.log("onRatePress error:", err);
+      Alert.alert("Couldn’t save", "Your server couldn’t import this item. Check logs.");
+    }
+  };
 
   return (
     <ScrollView
@@ -89,7 +174,7 @@ export default function DetailContent({
         </View>
       )}
 
-      {/* ACTION BUTTONS */}
+      {/* ACTION BUTTONS
       <View style={styles.detailActionsRow}>
         <TouchableOpacity style={styles.rateButton} activeOpacity={0.8}>
           <Feather name="star" size={18} color="#fff" />
@@ -110,6 +195,41 @@ export default function DetailContent({
           <Feather name="play" size={18} color="#fff" />
           <Text style={styles.playButtonText}>Play</Text>
         </TouchableOpacity>
+      </View> */}
+      {/* ACTION BUTTONS */}
+      <View style={styles.detailActionsRow}>
+        <TouchableOpacity
+          style={styles.rateButton}
+          activeOpacity={0.8}
+          onPress={onRatePress}
+          disabled={!spotifyId} // optional safety
+        >
+          <Feather name="star" size={18} color="#fff" />
+          <Text style={styles.rateButtonText}>
+            {type === "Tracks"
+              ? "Rate Track"
+              : type === "Albums"
+              ? "Rate Album"
+              : "Rate Artist"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.playButton}
+          activeOpacity={0.8}
+          onPress={() => item.spotifyUrl && Linking.openURL(item.spotifyUrl)}
+        >
+          <Feather name="play" size={18} color="#fff" />
+          <Text style={styles.playButtonText}>Play</Text>
+        </TouchableOpacity>
+        <FavoriteButton
+          key={`${type}-${spotifyId}`}
+          type={type}
+          spotifyId={spotifyId}
+          initialFavorite={initialFavorite}
+          // optional: keep your local state synced if you want
+          onToggle={(next) => setInitialFavorite(next)}
+        />
       </View>
 
       {/* RATINGS */}
@@ -181,7 +301,9 @@ export default function DetailContent({
                           coverUrl: hero,
                           album: title,
                           spotifyUrl: t.spotifyUrl,
-                        });
+                        },
+                        "Tracks"
+                      );
                       }}
                     >
                       <Text style={styles.trackTitle}>{t.name}</Text>

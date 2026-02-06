@@ -8,6 +8,9 @@ const userRoutes = require("./routes/user");
 const songRoutes = require("./routes/songs");
 const albumRoutes = require("./routes/albums");
 const artistRoutes = require("./routes/artists");
+const ensureRoutes = require("./routes/ensure");
+const favouritesRoutes = require("./routes/favourites");
+
 
 const { pool } = require("./db");
 
@@ -25,6 +28,8 @@ app.use("/", userRoutes);
 app.use("/", songRoutes);
 app.use("/", albumRoutes);
 app.use("/", artistRoutes);
+app.use("/", ensureRoutes);
+app.use("/", favouritesRoutes);
 
 // ===== DB TEST ROUTE =====
 app.get("/db-test", async (req, res) => {
