@@ -11,7 +11,7 @@ export { Feather, FontAwesome } from "@expo/vector-icons";
 
 export {
     ActivityIndicator, Animated, Dimensions, Easing, FlatList, Image, Linking,
-    PanResponder, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View
+    PanResponder, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View
 } from "react-native";
 
 

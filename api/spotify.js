@@ -4,6 +4,9 @@ import { encode as btoa } from "base-64";
 /* ============================================================
    TOKEN CACHE (CRITICAL SPEED BOOST)
    ============================================================ */
+
+// ⚠️ DO NOT ship secrets in a mobile app.
+// Move token to backend, or load from secure env for development only.
 const CLIENT_ID = "c7d7aa47c5554dff888bf92c0a16928e";
 const CLIENT_SECRET = "1b7386a050114a7eaf57b6569e386d12";
 
@@ -103,97 +106,133 @@ async function fetchBillboardPlaylist() {
 }
 
 /* ============================================================
-   POPULAR ALBUMS — uses Billboard cache
+   DERIVED TOP LIST CACHES (built from Billboard cache)
    ============================================================ */
-export async function getTopAlbumsSpotify(limit = 39) {
-  if (!limit || limit <= 0) limit = 39;
+
+let _topAlbumsCache = null;
+let _topAlbumsCacheTime = 0;
+
+let _topTracksCache = null;
+let _topTracksCacheTime = 0;
+
+function buildTopAlbumsFromBillboard(allItems) {
+  const out = [];
+  const seen = new Set();
+  let rank = 1;
+
+  for (let i = 0; i < allItems.length; i++) {
+    const track = allItems[i]?.track;
+    const album = track?.album;
+
+    if (!track || !album || !album.id) continue;
+    if (seen.has(album.id)) continue;
+
+    seen.add(album.id);
+
+    const artists =
+      (track.artists || album.artists || [])
+        .map((a) => a?.name)
+        .filter(Boolean)
+        .join(", ") || "Unknown Artist";
+
+    out.push({
+      id: album.id,
+      rank: rank++,
+      title: album.name || "",
+      artist: artists,
+      type: album.album_type,
+      coverUrl: pickImage(album.images),
+      popularity: track.popularity ?? 0,
+      releaseDate: album.release_date || null,
+      trackCount: album.total_tracks ?? null,
+      spotifyUrl:
+        track.external_urls?.spotify || album.external_urls?.spotify || null,
+    });
+  }
+
+  return out;
+}
+
+function buildTopTracksFromBillboard(allItems) {
+  const out = [];
+  const seen = new Set();
+  let rank = 1;
+
+  for (let i = 0; i < allItems.length; i++) {
+    const track = allItems[i]?.track;
+
+    if (!track || !track.id) continue;
+    if (seen.has(track.id)) continue;
+
+    seen.add(track.id);
+
+    const album = track.album;
+    const artists =
+      track.artists?.map((a) => a?.name).filter(Boolean).join(", ") ||
+      "Unknown Artist";
+
+    out.push({
+      id: track.id,
+      rank: rank++,
+      title: track.name,
+      artist: artists,
+      album: album?.name || "",
+      coverUrl: pickImage(album?.images),
+      popularity: track.popularity ?? 0,
+      releaseDate: album?.release_date || null,
+      spotifyUrl: track.external_urls?.spotify || null,
+    });
+  }
+
+  return out;
+}
+
+/* ============================================================
+   POPULAR ALBUMS — paged (limit + offset), derived from cache
+   ============================================================ */
+export async function getTopAlbumsSpotify(limit = 12, offset = 0) {
+  if (limit <= 0) limit = 12;
+  if (offset < 0) offset = 0;
 
   try {
-    const allItems = await fetchBillboardPlaylist();
+    const now = Date.now();
 
-    const out = [];
-    const seen = new Set();
-    let rank = 1;
-
-    for (let i = 0; i < allItems.length && out.length < limit; i++) {
-      const track = allItems[i]?.track;
-      const album = track?.album;
-
-      if (!track || !album || !album.id) continue;
-      if (seen.has(album.id)) continue;
-
-      seen.add(album.id);
-
-      const artists =
-        (track.artists || album.artists || [])
-          .map((a) => a?.name)
-          .filter(Boolean)
-          .join(", ") || "Unknown Artist";
-
-      out.push({
-        id: album.id,
-        rank: rank++,
-        title: album.name || "",
-        artist: artists,
-        type: album.album_type,
-        coverUrl: pickImage(album.images),
-        popularity: track.popularity ?? 0,
-        releaseDate: album.release_date || null,
-        trackCount: album.total_tracks ?? null,
-        spotifyUrl:
-          track.external_urls?.spotify || album.external_urls?.spotify || null,
-      });
+    // refresh derived cache every 3 minutes
+    if (!_topAlbumsCache || now - _topAlbumsCacheTime > 180000) {
+      const allItems = await fetchBillboardPlaylist();
+      _topAlbumsCache = buildTopAlbumsFromBillboard(allItems);
+      _topAlbumsCacheTime = now;
     }
 
-    return { albums: out };
+    const page = _topAlbumsCache.slice(offset, offset + limit);
+    return { albums: page, total: _topAlbumsCache.length };
   } catch (err) {
     console.error("Spotify top albums error:", err);
-    return { albums: [] };
+    return { albums: [], total: 0 };
   }
 }
 
 /* ============================================================
-   POPULAR TRACKS — uses Billboard cache
+   POPULAR TRACKS — paged (limit + offset), derived from cache
    ============================================================ */
-export async function getTopTracksSpotify(limit = 39) {
-  if (!limit || limit <= 0) limit = 39;
+export async function getTopTracksSpotify(limit = 12, offset = 0) {
+  if (limit <= 0) limit = 12;
+  if (offset < 0) offset = 0;
 
   try {
-    const allItems = await fetchBillboardPlaylist();
+    const now = Date.now();
 
-    const out = [];
-    const seen = new Set();
-    let rank = 1;
-
-    for (let i = 0; i < allItems.length && out.length < limit; i++) {
-      const track = allItems[i]?.track;
-      if (!track || !track.id) continue;
-      if (seen.has(track.id)) continue;
-
-      seen.add(track.id);
-
-      const album = track.album;
-      const artists =
-        track.artists?.map((a) => a?.name).filter(Boolean).join(", ") ||
-        "Unknown Artist";
-
-      out.push({
-        id: track.id,
-        rank: rank++,
-        title: track.name,
-        artist: artists,
-        album: album?.name || "",
-        coverUrl: pickImage(album?.images),
-        popularity: track.popularity ?? 0,
-        releaseDate: album?.release_date || null,
-        spotifyUrl: track.external_urls?.spotify || null,
-      });
+    if (!_topTracksCache || now - _topTracksCacheTime > 180000) {
+      const allItems = await fetchBillboardPlaylist();
+      _topTracksCache = buildTopTracksFromBillboard(allItems);
+      _topTracksCacheTime = now;
     }
 
-    return { tracks: out };
+    const page = _topTracksCache.slice(offset, offset + limit);
+    return { tracks: page, total: _topTracksCache.length };
   } catch (err) {
     console.error("Spotify top tracks error:", err);
-    return { tracks: [] };
+    return { tracks: [], total: 0 };
   }
 }
 
@@ -368,9 +407,7 @@ export async function getAlbumTracksSpotify(albumId) {
         (t.id ? `https://open.spotify.com/track/${t.id}` : null),
     }));
 
-    out.sort(
-      (a, b) => (a.track_number ?? 0) - (b.track_number ?? 0)
-    );
+    out.sort((a, b) => (a.track_number ?? 0) - (b.track_number ?? 0));
 
     return { tracks: out };
   } catch (err) {
@@ -378,11 +415,6 @@ export async function getAlbumTracksSpotify(albumId) {
     return { tracks: [] };
   }
 }
-
-
-
-
-
 
 /* ============================================================
    LOOKUP BY ID FOR FAVORITES
@@ -402,7 +434,7 @@ export async function getAlbumByIdSpotify(id) {
   return {
     id: album.id,
     title: album.name,
-    artist: album.artists?.map(a => a.name).join(", ") || "",
+    artist: album.artists?.map((a) => a.name).join(", ") || "",
     coverUrl: album.images?.[0]?.url || null,
     trackCount: album.total_tracks,
     releaseDate: album.release_date,
@@ -423,7 +455,7 @@ export async function getSongByIdSpotify(id) {
   return {
     id: track.id,
     title: track.name,
-    artist: track.artists?.map(a => a.name).join(", ") || "",
+    artist: track.artists?.map((a) => a.name).join(", ") || "",
     coverUrl: track.album?.images?.[0]?.url || null,
     album: track.album?.name || "",
   };

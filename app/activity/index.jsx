@@ -112,16 +112,16 @@ export default function Activity() {
         {activeTab === "Messages" ? (
           <View style={styles.centerWrap}>
             <Text style={styles.inviteText}>
-              Share your favorite music with friends on Audiary, or start a new chat to connect with other members.
+              Messaging Coming Soon!
             </Text>
 
-            <TouchableOpacity style={styles.inviteButton} activeOpacity={0.9}>
+            {/* <TouchableOpacity style={styles.inviteButton} activeOpacity={0.9}>
               <Text style={styles.inviteButtonText}>Invite Friends</Text>
             </TouchableOpacity>
 
             <TouchableOpacity activeOpacity={0.7}>
               <Text style={styles.startChatText}>Start a new chat</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         ) : (
           <View style={styles.centerWrap}>
