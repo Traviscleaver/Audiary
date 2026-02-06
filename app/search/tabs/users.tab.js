@@ -9,7 +9,7 @@ export default {
   key: "Users",
   placeholder: "Search Users",
 
-  previewSearch: async ({ query, limit = 5 } = {}) => {
+  previewSearch: async ({ query, limit = 15 } = {}) => {
     const q = normalizeQuery(query);
     if (q.length < 2) return { users: [] };
 

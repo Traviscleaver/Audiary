@@ -1,12 +1,12 @@
 // app/search/tabs/music.tab.js
 
 import {
-    searchAlbumsSpotify,
-    searchArtistsSpotify,
-    searchTracksSpotify,
+  searchAlbumsSpotify,
+  searchArtistsSpotify,
+  searchTracksSpotify,
 } from "../../shared/imports";
 
-const MAX_PREVIEW = 5;
+const MAX_PREVIEW = 15;
 
 export default {
   key: "Music",
