@@ -6,12 +6,9 @@ import { api, getMyProfile, getMyStats } from "../../../lib/api";
 /**
  * Loads:
  * - profile (if missing) and saves to AuthContext
- * - extra profile datasets (stats/favorites/reviews/ratings/playlists/diary/activity)
+ * - extra datasets (stats/reviews/ratings/playlists/diary/activity)
  *
- * Usage:
- * const {
- *   loading, profile, stats, favourites, reviews, ratings, playlists, diary, activity, refresh
- * } = useProfileData();
+ * Favourites are handled by useFavouriteData().
  */
 export default function useProfileData() {
   const { status, profile, saveProfile } = useAuth();
@@ -27,7 +24,6 @@ export default function useProfileData() {
   const [diary, setDiary] = useState([]);
   const [activity, setActivity] = useState([]);
 
-  // Prevent stale async updates
   const runIdRef = useRef(0);
 
   // 1) Fetch profile if missing (logged-in only)
@@ -62,7 +58,6 @@ export default function useProfileData() {
     let cancelled = false;
 
     (async () => {
-      console.log("loadingExtra -> true");
       setLoadingExtra(true);
 
       try {
@@ -95,10 +90,7 @@ export default function useProfileData() {
       } catch (e) {
         console.log("EXTRA LOAD ERROR", e);
       } finally {
-        if (!cancelled) {
-          console.log("loadingExtra -> false");
-          setLoadingExtra(false);
-        }
+        if (!cancelled) setLoadingExtra(false);
       }
     })();
 
@@ -106,8 +98,7 @@ export default function useProfileData() {
       cancelled = true;
     };
   }, [status, profile?.username]);
- 
-  // Optional: manual refresh (pull to refresh, returning from edit, etc.)
+
   const refresh = async () => {
     if (status !== "logged-in") return;
     if (!profile?.username) return;
@@ -121,7 +112,6 @@ export default function useProfileData() {
     try {
       const [
         statsRes,
-        favRes,
         reviewsRes,
         ratingsRes,
         playlistsRes,
@@ -129,7 +119,6 @@ export default function useProfileData() {
         activityRes,
       ] = await Promise.all([
         getMyStats(username),
-        api(`/users/${username}/favorites`),
         api(`/users/${username}/reviews`),
         api(`/users/${username}/ratings`),
         api(`/users/${username}/playlists`),
@@ -140,7 +129,6 @@ export default function useProfileData() {
       if (runId !== runIdRef.current) return;
 
       setStats(statsRes.stats || {});
-      setFavourites(favRes.favorites || []);
       setReviews(reviewsRes.reviews || []);
       setRatings(ratingsRes.ratings || []);
       setPlaylists(playlistsRes.playlists || []);
@@ -155,21 +143,20 @@ export default function useProfileData() {
     }
   };
 
-return {
-  status,
-  profile,
-  loadingProfile,
-  loadingExtra,
-  error,
+  return {
+    status,
+    profile,
+    loadingProfile,
+    loadingExtra,
+    error,
 
-  stats,
-  playlists,
-  reviews,
-  ratings,
-  diary,
-  activity,
+    stats,
+    playlists,
+    reviews,
+    ratings,
+    diary,
+    activity,
 
-  refresh,
-};
-
+    refresh,
+  };
 }

@@ -1,4 +1,7 @@
 // app/shared/components/search/overlays/DetailContent.jsx
+import { useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
+import { ensureAlbum, ensureTrack, favouritesExistsBySpotify } from "../../../../../lib/api";
 import {
   ActivityIndicator,
   COLORS,
@@ -13,10 +16,7 @@ import {
   useSafeAreaInsets,
   View,
 } from "../../../imports";
-import { ensureAlbum, ensureArtist, ensureTrack, favouritesExistsBySpotify  } from "../../../../../lib/api";
-import { Alert } from "react-native";
 import FavoriteButton from "../../favouriteButton";
-import React, { useEffect, useRef, useState } from "react";
 
 export default function DetailContent({
   type,
@@ -51,6 +51,30 @@ export default function DetailContent({
 
   // small in-memory cache so it doesn't spam when rerendering
   const existsCacheRef = useRef(new Map()); // key -> { exists, item_id, at }
+
+const canAddFavouriteOrAlert = async () => {
+  try {
+    const r = await favouritesCountByType(type);
+    if ((r?.count ?? 0) >= 3) {
+      Alert.alert(
+        "Favourite limit reached",
+        `You can only have 3 favourite ${
+          type === "Tracks" ? "songs" : type === "Albums" ? "albums" : "artists"
+        }.`
+      );
+      return false;
+    }
+    return true;
+  } catch (e) {
+    // ✅ If endpoint doesn't exist yet (404), don't block
+    const msg = String(e?.message || "");
+    if (msg.includes("404")) return true;
+
+    // Otherwise also don't block (server will enforce max)
+    return true;
+  }
+};
+
 
   useEffect(() => {
     let cancelled = false;
@@ -239,6 +263,10 @@ export default function DetailContent({
           type={type}
           spotifyId={spotifyId}
           initialFavorite={initialFavorite}
+          beforeToggle={async (next) => {
+            if (next === true) return await canAddFavouriteOrAlert();
+            return true;
+          }}
           onToggle={(next) => setInitialFavorite(next)}
         />
       </View>

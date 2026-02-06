@@ -1,13 +1,15 @@
 // controllers/favouritesController.js
 const { pool } = require("../db");
 
-// UI types -> DB enum types
+// -----------------------------
+// Type normalization
+// -----------------------------
 function normalizeType(type) {
   if (!type) return null;
 
-  // accept both UI labels and DB enum values
   const t = String(type).trim();
 
+  // Accept UI labels + enum values
   if (t === "Tracks" || t === "Track" || t === "song") return "song";
   if (t === "Albums" || t === "Album" || t === "album") return "album";
   if (t === "Artists" || t === "Artist" || t === "artist") return "artist";
@@ -15,29 +17,83 @@ function normalizeType(type) {
   return null;
 }
 
+function mapClientTypeToDbEnum(type) {
+  // client sends: "Tracks" | "Albums" | "Artists"
+  if (type === "Tracks") return "song";
+  if (type === "Albums") return "album";
+  if (type === "Artists") return "artist";
+  return null;
+}
+
+async function getDbIdFromSpotify(itemType, spotifyId) {
+  if (itemType === "song") {
+    const r = await pool.query(
+      `SELECT song_id AS id FROM songs WHERE spotify_id = $1 LIMIT 1`,
+      [spotifyId]
+    );
+    return r.rows[0]?.id ?? null;
+  }
+  if (itemType === "album") {
+    const r = await pool.query(
+      `SELECT album_id AS id FROM albums WHERE spotify_id = $1 LIMIT 1`,
+      [spotifyId]
+    );
+    return r.rows[0]?.id ?? null;
+  }
+  if (itemType === "artist") {
+    const r = await pool.query(
+      `SELECT artist_id AS id FROM artists WHERE spotify_id = $1 LIMIT 1`,
+      [spotifyId]
+    );
+    return r.rows[0]?.id ?? null;
+  }
+  return null;
+}
+
+async function countUserFavouritesByType(userId, itemType) {
+  const r = await pool.query(
+    `SELECT COUNT(*)::int AS count
+     FROM favorites
+     WHERE user_id = $1 AND item_type = $2`,
+    [userId, itemType]
+  );
+  return r.rows[0]?.count ?? 0;
+}
+
 // =======================================
 // POST /favorites
 // Add (set) favourite
-// Body: { type: "Tracks"|"Albums"|"Artists" (or song/album/artist), item_id: number }
-// Note: ensure/import happens BEFORE calling this.
+// Body: { type, item_id }
+// Enforce max 3 per type
 // =======================================
 exports.setFavourite = async (req, res) => {
   try {
     const userId = req.user.user_id;
-
     const { type, item_id } = req.body;
 
     const itemType = normalizeType(type);
     const itemId = Number(item_id);
 
     if (!itemType) {
-      return res.status(400).json({ error: "Invalid type. Use Tracks/Albums/Artists." });
+      return res
+        .status(400)
+        .json({ error: "Invalid type. Use Tracks/Albums/Artists." });
     }
     if (!Number.isFinite(itemId)) {
       return res.status(400).json({ error: "Invalid item_id" });
     }
 
-    // Insert if missing; if already exists, keep it (idempotent)
+    // ✅ max 3 per item_type
+    const currentCount = await countUserFavouritesByType(userId, itemType);
+    if (currentCount >= 3) {
+      return res.status(409).json({
+        error: `Max favourites reached for ${itemType}.`,
+        code: "FAV_MAX_REACHED",
+        max: 3,
+        count: currentCount,
+      });
+    }
+
     const result = await pool.query(
       `
       INSERT INTO favorites (user_id, item_type, item_id)
@@ -73,7 +129,9 @@ exports.removeFavourite = async (req, res) => {
     const itemId = Number(item_id);
 
     if (!itemType) {
-      return res.status(400).json({ error: "Invalid type. Use Tracks/Albums/Artists." });
+      return res
+        .status(400)
+        .json({ error: "Invalid type. Use Tracks/Albums/Artists." });
     }
     if (!Number.isFinite(itemId)) {
       return res.status(400).json({ error: "Invalid item_id" });
@@ -119,33 +177,6 @@ exports.getMyFavourites = async (req, res) => {
   }
 };
 
-
-
-
-function mapClientTypeToDbEnum(type) {
-  // client sends: "Tracks" | "Albums" | "Artists"
-  if (type === "Tracks") return "song";
-  if (type === "Albums") return "album";
-  if (type === "Artists") return "artist";
-  return null;
-}
-
-async function getDbIdFromSpotify(itemType, spotifyId) {
-  if (itemType === "song") {
-    const r = await pool.query(`SELECT song_id AS id FROM songs WHERE spotify_id = $1 LIMIT 1`, [spotifyId]);
-    return r.rows[0]?.id ?? null;
-  }
-  if (itemType === "album") {
-    const r = await pool.query(`SELECT album_id AS id FROM albums WHERE spotify_id = $1 LIMIT 1`, [spotifyId]);
-    return r.rows[0]?.id ?? null;
-  }
-  if (itemType === "artist") {
-    const r = await pool.query(`SELECT artist_id AS id FROM artists WHERE spotify_id = $1 LIMIT 1`, [spotifyId]);
-    return r.rows[0]?.id ?? null;
-  }
-  return null;
-}
-
 // =======================================
 // GET /favorites/exists?type=Tracks&spotifyId=...
 // checks if current user has favourited the item (by spotify id)
@@ -161,10 +192,8 @@ exports.existsFavouriteBySpotifyId = async (req, res) => {
     if (!item_type) return res.status(400).json({ error: "Invalid type" });
     if (!spotifyId) return res.status(400).json({ error: "Missing spotifyId" });
 
-    // Find DB id for this spotify item
     const item_id = await getDbIdFromSpotify(item_type, spotifyId);
     if (!item_id) {
-      // not even in DB → cannot be favourited
       return res.json({ exists: false, item_id: null });
     }
 
@@ -185,6 +214,54 @@ exports.existsFavouriteBySpotifyId = async (req, res) => {
     });
   } catch (err) {
     console.error("existsFavouriteBySpotifyId error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// =======================================
+// GET /favorites/count?type=Tracks
+// Returns { count, max, item_type }
+// =======================================
+exports.countMyFavouritesByType = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    const itemType = normalizeType(req.query.type);
+    if (!itemType) return res.status(400).json({ error: "Invalid type" });
+
+    const count = await countUserFavouritesByType(userId, itemType);
+    return res.json({ count, max: 3, item_type: itemType });
+  } catch (err) {
+    console.error("countMyFavouritesByType error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+exports.countMyFavouritesByType = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+
+    const type = req.query.type;
+
+    // reuse your normalizeType() function:
+    const itemType = normalizeType(type);
+    if (!itemType) return res.status(400).json({ error: "Invalid type" });
+
+    const r = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM favorites
+       WHERE user_id = $1 AND item_type = $2`,
+      [userId, itemType]
+    );
+
+    return res.json({
+      count: r.rows[0]?.count ?? 0,
+      max: 3,
+      item_type: itemType,
+    });
+  } catch (err) {
+    console.error("countMyFavouritesByType error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
