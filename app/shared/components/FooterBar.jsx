@@ -1,3 +1,4 @@
+// app/shared/components/FooterBar.jsx (or wherever yours lives)
 import { usePathname } from "expo-router";
 import { COLORS, Feather, TouchableOpacity, View } from "../imports";
 
@@ -7,13 +8,18 @@ export default function FooterBar({ router, insets }) {
   const TABS = [
     { route: "/home", icon: "home" },
     { route: "/search", icon: "search" },
-    { route: "/add", icon: "plus", isCenter: true },
+    { route: "/review", icon: "plus", isCenter: true },
     { route: "/activity", icon: "message-circle" },
     { route: "/profile", icon: "user" },
   ];
 
   const BAR_HEIGHT = 58;
-  const SLOT_HEIGHT = 80; // ✅ big hit target per icon
+  const SLOT_HEIGHT = 80;
+
+  const onUniversalRatePress = () => {
+    // ✅ Combined search handles song + album
+    router.push({ pathname: "/review" });
+  };
 
   return (
     <View
@@ -59,7 +65,7 @@ export default function FooterBar({ router, insets }) {
                 }}
               >
                 <TouchableOpacity
-                  onPress={() => router.push("/add")}
+                  onPress={onUniversalRatePress}
                   activeOpacity={0.85}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   style={{
@@ -77,7 +83,7 @@ export default function FooterBar({ router, insets }) {
             );
           }
 
-          // ✅ Normal tab: full slot press area
+          // ✅ Normal tabs
           return (
             <TouchableOpacity
               key={index}
@@ -88,7 +94,7 @@ export default function FooterBar({ router, insets }) {
               hitSlop={{ top: 10, bottom: 10, left: 14, right: 14 }}
               style={{
                 flex: 1,
-                height: SLOT_HEIGHT, // ✅ makes the whole slot easy to hit
+                height: SLOT_HEIGHT,
                 alignItems: "center",
                 justifyContent: "center",
               }}
