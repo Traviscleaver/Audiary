@@ -10,7 +10,8 @@ const albumRoutes = require("./routes/albums");
 const artistRoutes = require("./routes/artists");
 const ensureRoutes = require("./routes/ensure");
 const favouritesRoutes = require("./routes/favourites");
-
+const reviewRoutes = require("./routes/reviews");
+const spotifyRoutes = require("./routes/spotify");
 
 const { pool } = require("./db");
 
@@ -24,12 +25,13 @@ app.use(express.json());
 // ===== ROUTES =====
 app.use("/auth", authRoutes);
 app.use("/", userRoutes);
-
+app.use("/spotify", spotifyRoutes);
 app.use("/", songRoutes);
 app.use("/", albumRoutes);
 app.use("/", artistRoutes);
 app.use("/", ensureRoutes);
 app.use("/", favouritesRoutes);
+app.use("/reviews", reviewRoutes);
 
 // ===== DB TEST ROUTE =====
 app.get("/db-test", async (req, res) => {
