@@ -3,58 +3,43 @@ import {
   COLORS,
   Feather,
   SIZES,
-  Text,
   TouchableOpacity,
   useSafeAreaInsets,
   View,
 } from "../../../imports";
 
-export default function DetailHeader({ title, onBack }) {
+export default function DetailHeader({ onBack }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ backgroundColor: COLORS.screen }}>
-      <View
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: insets.top + SIZES.navHeight,
+        backgroundColor: "transparent",
+        zIndex: 9999,
+      }}
+      pointerEvents="box-none"
+    >
+      <TouchableOpacity
+        onPress={onBack}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         style={{
-          paddingTop: insets.top,
-          height: SIZES.navHeight + insets.top,
-          flexDirection: "row",
-          alignItems: "center",
+          position: "absolute",
+          left: 12,
+          top: insets.top + 6,
+          height: 34,
+          width: 34,
+          borderRadius: 17,
           justifyContent: "center",
-          paddingHorizontal: 16,
-          borderBottomColor: COLORS.divider,
-          borderBottomWidth: 1,
+          alignItems: "center",
         }}
       >
-        <TouchableOpacity
-          onPress={onBack}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          style={{
-            position: "absolute",
-            left: 10,
-            top: insets.top + (SIZES.navHeight - 24) / 2,
-            height: 24,
-            width: 24,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Feather name="arrow-left" size={24} color={COLORS.text} />
-        </TouchableOpacity>
-
-        <Text numberOfLines={1} style={styles.title}>
-          {title}
-        </Text>
-      </View>
+        <Feather name="arrow-left" size={20} color={COLORS.text} />
+      </TouchableOpacity>
     </View>
   );
 }
-
-const styles = {
-  title: {
-    color: COLORS.text,
-    fontSize: 18,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-};
