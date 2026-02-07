@@ -1,0 +1,141 @@
+| table_name        | column_name          | data_type                   |
+| ----------------- | -------------------- | --------------------------- |
+| activities        | activity_id          | integer                     |
+| activities        | user_id              | integer                     |
+| activities        | type                 | USER-DEFINED                |
+| activities        | target_id            | integer                     |
+| activities        | description          | text                        |
+| activities        | created_at           | timestamp without time zone |
+| albums            | album_id             | integer                     |
+| albums            | spotify_id           | text                        |
+| albums            | mbid                 | uuid                        |
+| albums            | artist_id            | integer                     |
+| albums            | title                | character varying           |
+| albums            | release_year         | integer                     |
+| albums            | cover_url            | text                        |
+| albums            | total_tracks         | integer                     |
+| albums            | last_fetched         | timestamp without time zone |
+| artists           | artist_id            | integer                     |
+| artists           | spotify_id           | text                        |
+| artists           | mbid                 | uuid                        |
+| artists           | name                 | character varying           |
+| artists           | image_url            | text                        |
+| artists           | followers            | integer                     |
+| artists           | genres               | ARRAY                       |
+| artists           | last_fetched         | timestamp without time zone |
+| auth_local        | user_id              | integer                     |
+| auth_local        | password_hash        | text                        |
+| comments          | comment_id           | integer                     |
+| comments          | review_id            | integer                     |
+| comments          | user_id              | integer                     |
+| comments          | content              | text                        |
+| comments          | created_at           | timestamp without time zone |
+| diary_entries     | entry_id             | integer                     |
+| diary_entries     | user_id              | integer                     |
+| diary_entries     | song_id              | integer                     |
+| diary_entries     | listened_at          | timestamp without time zone |
+| diary_entries     | rating               | numeric                     |
+| diary_entries     | review_id            | integer                     |
+| diary_entries     | notes                | text                        |
+| favorites         | user_id              | integer                     |
+| favorites         | item_type            | USER-DEFINED                |
+| favorites         | item_id              | integer                     |
+| favorites         | added_at             | timestamp without time zone |
+| follows           | follower_id          | integer                     |
+| follows           | following_id         | integer                     |
+| follows           | followed_at          | timestamp without time zone |
+| listen_later      | user_id              | integer                     |
+| listen_later      | song_id              | integer                     |
+| listen_later      | added_at             | timestamp without time zone |
+| message_reactions | message_id           | integer                     |
+| message_reactions | user_id              | integer                     |
+| message_reactions | reaction             | text                        |
+| message_reactions | reacted_at           | timestamp without time zone |
+| messages          | message_id           | integer                     |
+| messages          | thread_id            | integer                     |
+| messages          | sender_id            | integer                     |
+| messages          | content              | text                        |
+| messages          | attachment_url       | text                        |
+| messages          | created_at           | timestamp without time zone |
+| notifications     | notification_id      | integer                     |
+| notifications     | user_id              | integer                     |
+| notifications     | type                 | text                        |
+| notifications     | payload              | jsonb                       |
+| notifications     | is_read              | boolean                     |
+| notifications     | created_at           | timestamp without time zone |
+| playlist_songs    | playlist_id          | integer                     |
+| playlist_songs    | song_id              | integer                     |
+| playlist_songs    | position             | integer                     |
+| playlists         | playlist_id          | integer                     |
+| playlists         | user_id              | integer                     |
+| playlists         | title                | character varying           |
+| playlists         | description          | text                        |
+| playlists         | is_public            | boolean                     |
+| playlists         | created_at           | timestamp without time zone |
+| review_likes      | review_id            | integer                     |
+| review_likes      | user_id              | integer                     |
+| review_likes      | liked_at             | timestamp without time zone |
+| reviews           | review_id            | integer                     |
+| reviews           | user_id              | integer                     |
+| reviews           | song_id              | integer                     |
+| reviews           | rating               | numeric                     |
+| reviews           | content              | text                        |
+| reviews           | created_at           | timestamp without time zone |
+| reviews           | updated_at           | timestamp without time zone |
+| reviews           | album_id             | integer                     |
+| song_artists      | song_id              | integer                     |
+| song_artists      | artist_id            | integer                     |
+| songs             | song_id              | integer                     |
+| songs             | spotify_id           | text                        |
+| songs             | mbid                 | uuid                        |
+| songs             | album_id             | integer                     |
+| songs             | title                | character varying           |
+| songs             | duration             | integer                     |
+| songs             | track_number         | integer                     |
+| songs             | isrc                 | character varying           |
+| songs             | popularity           | integer                     |
+| songs             | preview_url          | text                        |
+| songs             | spotify_url          | text                        |
+| songs             | last_fetched         | timestamp without time zone |
+| stats             | user_id              | integer                     |
+| stats             | total_reviews        | integer                     |
+| stats             | total_ratings        | integer                     |
+| stats             | avg_rating           | numeric                     |
+| stats             | total_songs_listened | integer                     |
+| stats             | total_artists        | integer                     |
+| stats             | last_updated         | timestamp without time zone |
+| thread_members    | thread_id            | integer                     |
+| thread_members    | user_id              | integer                     |
+| thread_members    | joined_at            | timestamp without time zone |
+| thread_members    | last_read_at         | timestamp without time zone |
+| threads           | thread_id            | integer                     |
+| threads           | is_group             | boolean                     |
+| threads           | name                 | character varying           |
+| threads           | created_by           | integer                     |
+| threads           | created_at           | timestamp without time zone |
+| threads           | last_message_text    | text                        |
+| threads           | last_message_sender  | integer                     |
+| threads           | last_message_at      | timestamp without time zone |
+| user_blocks       | blocker_id           | integer                     |
+| user_blocks       | blocked_id           | integer                     |
+| user_blocks       | blocked_at           | timestamp without time zone |
+| user_pins         | user_id              | integer                     |
+| user_pins         | item_type            | USER-DEFINED                |
+| user_pins         | item_id              | integer                     |
+| user_pins         | pinned_at            | timestamp without time zone |
+| user_profiles     | user_id              | integer                     |
+| user_profiles     | first_name           | character varying           |
+| user_profiles     | last_name            | character varying           |
+| user_profiles     | bio                  | text                        |
+| user_profiles     | location             | character varying           |
+| user_profiles     | website              | character varying           |
+| user_profiles     | banner_url           | text                        |
+| user_profiles     | last_updated         | timestamp without time zone |
+| users             | user_id              | integer                     |
+| users             | email                | character varying           |
+| users             | username             | character varying           |
+| users             | display_name         | character varying           |
+| users             | avatar_url           | text                        |
+| users             | joined_at            | timestamp without time zone |
+| users             | oauth_provider       | text                        |
+| users             | oauth_sub            | text                        |

@@ -4,6 +4,7 @@ const {
   getSpotifyTrack,
   getSpotifyAlbum,
   getSpotifyArtistsByIds,
+  getSpotifyArtist, // ✅ ADD THIS (make sure spotifyClient exports it)
 } = require("../lib/spotifyClient");
 
 // ---------- helpers ----------
@@ -117,6 +118,50 @@ async function upsertSong(client, track, album_id) {
 
   return result.rows[0].song_id;
 }
+
+// =======================================
+// POST /ensure/artist/:spotifyArtistId
+// Ensures artist exists; returns DB id
+// =======================================
+exports.ensureArtist = async (req, res) => {
+  const spotifyArtistId = req.params.spotifyArtistId;
+
+  try {
+    // quick DB hit: already imported?
+    const existing = await pool.query(
+      `SELECT artist_id FROM artists WHERE spotify_id = $1 LIMIT 1`,
+      [spotifyArtistId]
+    );
+    if (existing.rows[0]) {
+      return res.json({ artist_id: existing.rows[0].artist_id, existed: true });
+    }
+
+    // fetch from Spotify (full artist object with genres/images/followers)
+    const artist = await getSpotifyArtist(spotifyArtistId);
+
+    if (!artist?.id || !artist?.name) {
+      return res.status(400).json({ error: "Spotify artist payload invalid" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const artist_id = await upsertArtist(client, artist);
+
+      await client.query("COMMIT");
+      return res.status(201).json({ artist_id, existed: false });
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error("ensureArtist error:", err);
+    return res.status(500).json({ error: "Failed to ensure artist" });
+  }
+};
 
 // =======================================
 // POST /ensure/track/:spotifyTrackId

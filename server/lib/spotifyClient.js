@@ -76,6 +76,13 @@ async function getSpotifyArtistsByIds(ids) {
   return res?.artists || [];
 }
 
+// ✅ NEW: Get single Spotify artist (full object: images/genres/followers)
+async function getSpotifyArtist(artistId) {
+  const id = String(artistId || "").trim();
+  if (!id) throw new Error("Missing artistId");
+  return spotifyGet(`/artists/${encodeURIComponent(id)}`);
+}
+
 /** ---------------- New: SEARCH ---------------- */
 
 /**
@@ -103,7 +110,9 @@ async function searchSpotifyTracks(query, opts = {}) {
     return {
       id: track?.id,
       name: track?.name || "",
-      artist: (track?.artists || []).map((a) => a?.name).filter(Boolean).join(", ") || "Unknown Artist",
+      artist:
+        (track?.artists || []).map((a) => a?.name).filter(Boolean).join(", ") ||
+        "Unknown Artist",
       album: album?.name || "",
       coverUrl: pickLargestImage(album?.images),
       popularity: track?.popularity ?? 0,
@@ -153,7 +162,9 @@ async function searchSpotifyAlbums(query, opts = {}) {
   const mapped = items.map((album) => ({
     id: album?.id,
     title: album?.name || "",
-    artist: (album?.artists || []).map((a) => a?.name).filter(Boolean).join(", ") || "Unknown Artist",
+    artist:
+      (album?.artists || []).map((a) => a?.name).filter(Boolean).join(", ") ||
+      "Unknown Artist",
     type: album?.album_type || null,
     coverUrl: pickLargestImage(album?.images),
     releaseDate: album?.release_date || null,
@@ -171,7 +182,7 @@ async function searchSpotifyAlbums(query, opts = {}) {
     deduped.push(a);
   }
 
-  deduped.sort((a, b) => (String(a.title).localeCompare(String(b.title))));
+  deduped.sort((a, b) => String(a.title).localeCompare(String(b.title)));
 
   return { albums: deduped };
 }
@@ -210,8 +221,7 @@ async function getSpotifyAlbumTracks(albumId, opts = {}) {
     track_number: t?.track_number ?? idx + 1,
     artists: (t?.artists || []).map((a) => a?.name).filter(Boolean),
     spotifyUrl:
-      t?.external_urls?.spotify ||
-      (t?.id ? `https://open.spotify.com/track/${t.id}` : null),
+      t?.external_urls?.spotify || (t?.id ? `https://open.spotify.com/track/${t.id}` : null),
   }));
 
   out.sort((a, b) => (a.track_number ?? 0) - (b.track_number ?? 0));
@@ -222,6 +232,7 @@ module.exports = {
   getSpotifyTrack,
   getSpotifyAlbum,
   getSpotifyArtistsByIds,
+  getSpotifyArtist, // ✅ EXPORT IT
 
   // ✅ new exports
   searchSpotifyTracks,

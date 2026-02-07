@@ -15,7 +15,7 @@ import {
   useSafeAreaInsets,
   View,
 } from "../../../imports";
-import { favouritesExistsBySpotify  } from "../../../../../lib/api";
+import { favouritesExistsBySpotify } from "../../../../../lib/api";
 import FavoriteButton from "../../favouriteButton";
 import { useRouter } from "expo-router";
 
@@ -137,7 +137,7 @@ const canAddFavouriteOrAlert = async () => {
         return;
       }
 
-      Alert.alert("Not ready yet", "Artist import not wired yet.");
+      Alert.alert("cant rate artist, remove this option");
     } catch (err) {
       console.log("onRatePress error:", err);
       Alert.alert("Couldn’t open", "Something went wrong opening the review screen.");

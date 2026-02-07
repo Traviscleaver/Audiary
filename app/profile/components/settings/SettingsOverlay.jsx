@@ -1,4 +1,5 @@
 // app/profile/components/settings/SettingsOverlay.jsx
+import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import { Dimensions } from "react-native";
 import { updateProfile } from "../../../../lib/api.js";
@@ -10,7 +11,6 @@ import {
   TouchableOpacity,
   View,
   useSafeAreaInsets,
-  useState,
 } from "../../../shared/imports";
 
 import { logout } from "../../../shared/utils/logout";
@@ -23,12 +23,6 @@ import { overlayStyles as styles } from "./styles";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-/**
- * SettingsOverlay = "orchestrator":
- * - owns animation + local popup/subOverlay state
- * - performs save API call
- * - composes subcomponents that render UI
- */
 export default function SettingsOverlay(props) {
   const {
     settingsAnim,
@@ -59,9 +53,8 @@ export default function SettingsOverlay(props) {
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { setAuthToken } = useAuth();
 
-  // ⚠️ keeping your original call pattern
+  const { setAuthToken } = useAuth();
   const { setFavourites } = useFavouriteData();
 
   const [activityOn, setActivityOn] = useState(true);
@@ -69,9 +62,10 @@ export default function SettingsOverlay(props) {
 
   const [passwordPopupOpen, setPasswordPopupOpen] = useState(false);
 
-  // Sub overlay only
   const [subOverlay, setSubOverlay] = useState(null); // "blocked" | null
   const subAnim = useState(() => new Animated.Value(0))[0];
+
+  const [signingOut, setSigningOut] = useState(false);
 
   const openSubOverlay = (key) => {
     setSubOverlay(key);
@@ -111,9 +105,34 @@ export default function SettingsOverlay(props) {
       closeSettings();
     } catch (err) {
       console.error("Profile update error:", err);
-      const msg =
-        err?.error || err?.message || "Failed to update profile. Please try again.";
+      const msg = err?.error || err?.message || "Failed to update profile. Please try again.";
       alert(msg);
+    }
+  };
+
+  // ✅ logout now lives here
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+
+    try {
+      // close local UI layers
+      if (passwordPopupOpen) setPasswordPopupOpen(false);
+      if (subOverlay) setSubOverlay(null);
+
+      // clear UI cache immediately
+      if (typeof setFavourites === "function") setFavourites([]);
+
+      // clear auth + storage
+      await setAuthToken(null);
+
+      // navigate away
+      router.replace("/LoginScreen");
+    } catch (e) {
+      console.log("LOGOUT FAILED:", e);
+      router.replace("/LoginScreen");
+    } finally {
+      setTimeout(() => setSigningOut(false), 400);
     }
   };
 
@@ -139,7 +158,6 @@ export default function SettingsOverlay(props) {
 
   return (
     <View style={styles.root}>
-      {/* fills whole screen with COLORS.screen */}
       <Animated.View
         style={[
           styles.screenFill,
@@ -159,7 +177,6 @@ export default function SettingsOverlay(props) {
         translateX={sheetTranslateX}
         onBack={handleBackPress}
         onSave={handleSave}
-        // content props
         handle={handle}
         setHandle={setHandle}
         givenName={givenName}
@@ -181,7 +198,7 @@ export default function SettingsOverlay(props) {
         setNotificationsOn={setNotificationsOn}
         onOpenPassword={() => setPasswordPopupOpen(true)}
         onOpenBlocked={() => openSubOverlay("blocked")}
-        onSignOut={() => logout(setAuthToken, setFavourites)}
+        onSignOut={handleSignOut}
       />
 
       {subOverlay === "blocked" && (

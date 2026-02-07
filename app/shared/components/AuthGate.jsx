@@ -1,8 +1,8 @@
 // app/shared/components/AuthGate.jsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { useAuth } from "../../../lib/AuthContext"; // adjust path if needed
+import { useAuth } from "../../../lib/AuthContext";
 
 export default function AuthGate({
   children,
@@ -16,14 +16,31 @@ export default function AuthGate({
 
   const [visible, setVisible] = useState(false);
 
-  // ✅ Auto-open when entering the screen (if guest)
-  useEffect(() => {
-    if (mode !== "onEnter") return;
-    if (status === "logged-in") return;
-    setVisible(true);
-  }, [mode, status]);
+  // ✅ Track previous status to detect logout transitions
+  const prevStatusRef = useRef(status);
 
-  // ✅ Reusable for button gating too (if you ever want it)
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = status;
+
+    if (mode !== "onEnter") return;
+
+    // If logged in, never show the gate
+    if (status === "logged-in") {
+      if (visible) setVisible(false);
+      return;
+    }
+
+    // ✅ IMPORTANT: If we JUST logged out (logged-in -> guest/checking), do not show modal
+    if (prev === "logged-in" && status !== "logged-in") {
+      if (visible) setVisible(false);
+      return;
+    }
+
+    // Normal case: guest entering protected screen
+    setVisible(true);
+  }, [mode, status]); // keep tight; avoid extra deps
+
   const gate = useCallback(
     (action) => {
       if (status === "logged-in") return action?.();
@@ -34,35 +51,31 @@ export default function AuthGate({
 
   const handleNotNow = () => {
     setVisible(false);
-
     if (onCancel === "back") {
-      // go back to previous page
       if (router.canGoBack?.()) router.back();
-      else router.replace("/LoginScreen"); // fallback if no history
+      else router.replace("/LoginScreen");
     }
   };
 
   const handleLogin = () => {
     setVisible(false);
-    router.replace('/LoginScreen');
+    router.replace("/LoginScreen");
   };
 
-  // If mode is onEnter, just render children normally (page exists, modal blocks)
-  // If mode is onAction, allow function-as-children to use gate()
-  const content =
-    typeof children === "function" ? children(gate) : children;
+  const content = typeof children === "function" ? children(gate) : children;
 
   return (
     <>
       {content}
 
-      <Modal 
-        visible={visible} 
-        transparent 
-        animationType="fade" 
-        presentationStyle="overFullScreen"     // ✅ iOS: allow seeing underlying screen
-        statusBarTranslucent={true}  
-        onRequestClose={handleNotNow}>
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        onRequestClose={handleNotNow}
+      >
         <View style={styles.overlay}>
           <View style={styles.card}>
             <Text style={styles.title}>{title}</Text>
