@@ -13,6 +13,7 @@ import {
   useSafeAreaInsets,
 } from "../../../shared/imports";
 
+import { logout } from "../../../shared/utils/logout";
 import useFavouriteData from "../../hooks/useFavouriteData";
 
 import BlockedOverlay from "./BlockedOverlay";
@@ -197,7 +198,7 @@ export default function SettingsOverlay(props) {
         setNotificationsOn={setNotificationsOn}
         onOpenPassword={() => setPasswordPopupOpen(true)}
         onOpenBlocked={() => openSubOverlay("blocked")}
-        onSignOut={handleSignOut} // ✅ changed
+        onSignOut={handleSignOut}
       />
 
       {subOverlay === "blocked" && (
