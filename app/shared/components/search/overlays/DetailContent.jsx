@@ -1,7 +1,5 @@
 // app/shared/components/search/overlays/DetailContent.jsx
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
-import { ensureAlbum, ensureTrack, favouritesExistsBySpotify } from "../../../../../lib/api";
 import {
   ActivityIndicator,
   COLORS,
@@ -12,14 +10,13 @@ import {
   ScrollView,
   SIZES,
   Text,
+  Alert,
   TouchableOpacity,
   useSafeAreaInsets,
   View,
 } from "../../../imports";
 import { favouritesExistsBySpotify  } from "../../../../../lib/api";
-import { Alert } from "react-native";
 import FavoriteButton from "../../favouriteButton";
-import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 
 export default function DetailContent({
