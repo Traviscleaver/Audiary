@@ -1,22 +1,4 @@
-// import { Stack } from "expo-router";
-// import React from "react";
-// import { AuthProvider } from "../lib/AuthContext";
-
-// export default function RootLayout() {
-//   return (
-//     <AuthProvider>
-//       <Stack
-//         screenOptions={{
-//           headerShown: false,
-//           animation: "none",
-//           gestureEnabled: false,
-//           contentStyle: { backgroundColor: "#121212",
-//           }
-//         }}
-//       />
-//     </AuthProvider>
-//   );
-// }
+// app/_layout.jsx
 import { Stack } from "expo-router";
 import React from "react";
 import { AuthProvider, useAuth } from "../lib/AuthContext";
@@ -24,12 +6,12 @@ import { AuthProvider, useAuth } from "../lib/AuthContext";
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <AuthGate />
+      <RootStack />
     </AuthProvider>
   );
 }
 
-function AuthGate() {
+function RootStack() {
   const { status } = useAuth();
 
   // 🛑 DO NOT RENDER ANYTHING until AuthProvider finishes loading the token

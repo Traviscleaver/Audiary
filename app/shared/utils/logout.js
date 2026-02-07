@@ -1,7 +1,7 @@
 // app/shared/utils/logout.js
 import { router } from "expo-router";
 
-export async function logout(setAuthToken) {
+export async function logout(setAuthToken, setFavourites) {
   try {
     if (typeof setFavourites === "function") setFavourites([]);
     await setAuthToken(null);
