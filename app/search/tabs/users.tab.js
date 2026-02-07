@@ -1,5 +1,5 @@
 // app/search/tabs/users.tab.js
-import { api } from "../../../lib/api";
+import { searchUsers } from "../../../lib/api";
 
 function normalizeQuery(q) {
   return String(q || "").trim();
@@ -13,11 +13,7 @@ export default {
     const q = normalizeQuery(query);
     if (q.length < 2) return { users: [] };
 
-    // ✅ NO /api here — your server route is /users/search
-    const res = await api(
-      `/users/search?q=${encodeURIComponent(q)}&limit=${limit}`
-    );
-
+    const res = await searchUsers(q, limit);
     const users = res?.users || res?.results || res?.data || [];
     return { users };
   },
@@ -26,9 +22,7 @@ export default {
     const q = normalizeQuery(query);
     if (q.length < 2) return [];
 
-    // ✅ NO /api here either
-    const res = await api(`/users/search?q=${encodeURIComponent(q)}`);
-
+    const res = await searchUsers(q);
     const users = res?.users || res?.results || res?.data || [];
     return users;
   },

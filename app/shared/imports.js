@@ -1,17 +1,18 @@
 export {
     memo, useEffect, useMemo, useRef, useState
 } from "react";
+export { AVATAR_SCALE };
 
+const AVATAR_SCALE = 1.2;
 
-export { useRouter } from "expo-router";
+    export { useRouter } from "expo-router";
 
 
 export { Feather, FontAwesome } from "@expo/vector-icons";
 
 
 export {
-    ActivityIndicator, Animated, Dimensions, Easing, FlatList, Image, Linking, Modal, Alert,
-    PanResponder, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View
+     Modal, Alert, ActivityIndicator, Animated, Dimensions, Easing, FlatList, Image, Linking, PanResponder, RefreshControl, Animated as RNAnimated, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View
 } from "react-native";
 
 

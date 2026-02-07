@@ -1,36 +1,72 @@
-// profile.jsx
+// app/profile/index.jsx
+import useFavouriteData from "./hooks/useFavouriteData";
 import useProfileData from "./hooks/useProfileData";
 import useProfileOverlays from "./hooks/useProfileOverlays";
-import useFavouriteData from "./hooks/useFavouriteData";
 
-import { RefreshControl } from "react-native";
+import * as SecureStore from "expo-secure-store";
+import { Animated, Platform, RefreshControl } from "react-native";
 
 import {
   COLORS,
-  Feather,
-  FlatList,
-  Image,
-  SIZES,
   SafeAreaView,
-  ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  memo,
   useEffect,
   useRouter,
   useSafeAreaInsets,
-  useState
+  useState,
 } from "../shared/imports";
+
+import { styles } from "./styles/styles";
 
 import AuthGate from "../shared/components/AuthGate.jsx";
 import FooterBar from "../shared/components/FooterBar.jsx";
-import FavoriteItemCard from "./components/FavoriteItemCard.jsx";
-import SettingsOverlay from "./components/SettingsOverlay.jsx";
+import CreateOverlay from "./components/CreateOverlay.jsx";
+
+// existing components
+import PlaceholderSlider from "./components/PlaceholderSlider.jsx";
+import ProfileHeader from "./components/ProfileHeader.jsx";
+import ProfileSection from "./components/ProfileSection.jsx";
+import ProfileTabsBar from "./components/ProfileTabsBar.jsx";
+import ProfileTopBar from "./components/ProfileTopBar.jsx";
+import SettingsOverlay from "./components/settings/SettingsOverlay.jsx";
+
+// favourites layout
+import FavouritesRow3 from "./components/favourites/FavouritesRow3.jsx";
+
+// overlays
+import FavouritesEditOverlay from "./components/overlays/FavouritesEditOverlay.jsx";
+import FavouritesSearchOverlay from "./components/overlays/FavouritesSearchOverlay.jsx";
+import ProfileSectionsOverlay from "./components/overlays/ProfileSectionsOverlay.jsx";
+
+// api to remove favourite
+import { removeFavourite } from "../../lib/api.js";
 
 const TABS = ["Home", "Reviews", "Lists"];
-const AVATAR_SCALE = 1.5;
+
+const HIDE_KEY = (userId) => `profile_hidden_fav_sections_v1_${userId}`;
+
+async function getPersisted(key) {
+  if (Platform.OS === "web") return localStorage.getItem(key);
+  return await SecureStore.getItemAsync(key);
+}
+async function setPersisted(key, value) {
+  if (Platform.OS === "web") {
+    if (!value) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+    return;
+  }
+  if (!value) await SecureStore.deleteItemAsync(key);
+  else await SecureStore.setItemAsync(key, value);
+}
+function safeParse(str) {
+  try {
+    return str ? JSON.parse(str) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function Profile() {
   const {
@@ -43,36 +79,21 @@ export default function Profile() {
     ratings,
     diary,
     activity,
-    // refresh, // (optional) if you want pull-to-refresh to refresh everything
   } = useProfileData();
 
   const {
     favourites,
     loadingFavourites,
     refresh: refreshFavourites,
-    clearFavouritesCache,
+    setFavourites,
   } = useFavouriteData();
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const insetsTop = insets.top;
 
   const isGuest = status !== "logged-in";
-
-  // ===== Pull-to-refresh state (separate from loadingFavourites)
-  const [refreshing, setRefreshing] = useState(false);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      // This bypasses cache in the hook (fresh pull from API)
-      await refreshFavourites();
-
-      // If you want to refresh the other profile datasets too:
-      // await refresh?.();
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  const userId = profile?.user_id || null;
 
   // ===== USER STATE =====
   const [handle, setHandle] = useState("");
@@ -84,7 +105,6 @@ export default function Profile() {
   const [website, setWebsite] = useState("");
   const [pronoun, setPronoun] = useState("He / his");
 
-  // For your Settings UI
   const [givenName, setGivenName] = useState("");
   const [familyName, setFamilyName] = useState("");
 
@@ -99,7 +119,31 @@ export default function Profile() {
     openEmailOverlay,
   } = useProfileOverlays();
 
-  // ===== Hydrate local UI fields from profile (when profile changes) =====
+  // ===== Create overlay =====
+  const [createOpen, setCreateOpen] = useState(false);
+  const createAnim = useState(() => new Animated.Value(0))[0];
+
+  const openCreate = () => {
+    setCreateOpen(true);
+    createAnim.setValue(0);
+    Animated.timing(createAnim, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeCreate = () => {
+    Animated.timing(createAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setCreateOpen(false);
+    });
+  };
+
+  // ===== Hydrate local UI fields from profile =====
   useEffect(() => {
     if (!profile) return;
 
@@ -121,185 +165,275 @@ export default function Profile() {
     }
   }, [profile]);
 
+  // ✅ Categorize favourites (max 3 each)
   const [favouriteAlbums, setFavouriteAlbums] = useState([]);
   const [favouriteSongs, setFavouriteSongs] = useState([]);
   const [favouriteArtists, setFavouriteArtists] = useState([]);
 
-  // Filter favourites by type
   useEffect(() => {
-    setFavouriteAlbums(favourites.filter((f) => f.item_type === "album"));
-    setFavouriteSongs(favourites.filter((f) => f.item_type === "song"));
-    setFavouriteArtists(favourites.filter((f) => f.item_type === "artist"));
+    setFavouriteAlbums(
+      favourites.filter((f) => f.item_type === "album").slice(0, 3)
+    );
+    setFavouriteSongs(
+      favourites.filter((f) => f.item_type === "song").slice(0, 3)
+    );
+    setFavouriteArtists(
+      favourites.filter((f) => f.item_type === "artist").slice(0, 3)
+    );
   }, [favourites]);
 
-  const PlaceholderSlider = memo(function PlaceholderSlider({ count, type }) {
-    const arr = Array.from({ length: count }).map((_, i) => ({
-      id: `${type}-${i}`,
-    }));
+  const showFavLoading =
+    (loadingFavourites || loadingExtra) && favourites.length === 0;
 
-    return (
-      <FlatList
-        horizontal
-        data={arr}
-        keyExtractor={(i) => i.id}
-        renderItem={() => (
-          <View style={styles.sliderItem}>
-            <View style={styles.cover} />
-            <View style={{ height: 10 }} />
-            <View style={styles.placeholderLine} />
-          </View>
-        )}
-        contentContainerStyle={styles.sliderContent}
-        showsHorizontalScrollIndicator={false}
-      />
-    );
+  const usernameTitle = isGuest ? "Guest" : handle || "User";
+
+  // =========================================================
+  // Sticky-then-hide Top Bar
+  // =========================================================
+  const TOPBAR_ROW_HEIGHT = 46;
+  const TOPBAR_PADDING_TOP = insets.top + 6;
+  const TOPBAR_TOTAL_HEIGHT = TOPBAR_PADDING_TOP + TOPBAR_ROW_HEIGHT;
+
+  const STICKY_DELAY_PX = 45;
+  const HIDE_DISTANCE = TOPBAR_TOTAL_HEIGHT;
+
+  const scrollY = useState(() => new Animated.Value(0))[0];
+
+  // stays visible for first STICKY_DELAY_PX,
+  // then slides out over HIDE_DISTANCE
+  const topBarTranslateY = scrollY.interpolate({
+    inputRange: [0, STICKY_DELAY_PX, STICKY_DELAY_PX + HIDE_DISTANCE],
+    outputRange: [0, 0, -HIDE_DISTANCE],
+    extrapolate: "clamp",
   });
 
-  // ✅ Only show placeholders when we have nothing yet
-  const showFavLoading = (loadingFavourites || loadingExtra) && favourites.length === 0;
+  // ✅ Search + Edit overlay state
+  const [favSearchOpen, setFavSearchOpen] = useState(false);
+  const [favEditOpen, setFavEditOpen] = useState(false);
+  const [favOverlayTitle, setFavOverlayTitle] = useState("");
+  const [editingKey, setEditingKey] = useState(null); // "album" | "song" | "artist"
+
+  const openSearchOverlay = (label) => {
+    setFavOverlayTitle(label);
+    setFavSearchOpen(true);
+  };
+
+  const openEditOverlay = (label, key) => {
+    setFavOverlayTitle(label);
+    setEditingKey(key);
+    setFavEditOpen(true);
+  };
+
+  // ✅ NEW: Customize overlay state
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+
+  // ✅ Hide sections state (persisted)
+  const [hiddenFavSections, setHiddenFavSections] = useState({
+    album: false,
+    song: false,
+    artist: false,
+  });
+
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      const raw = await getPersisted(HIDE_KEY(userId));
+      const parsed = safeParse(raw);
+      if (parsed && typeof parsed === "object") {
+        setHiddenFavSections((prev) => ({ ...prev, ...parsed }));
+      }
+    })();
+  }, [userId]);
+
+  const setHidden = async (key, nextHidden) => {
+    const next = { ...hiddenFavSections, [key]: nextHidden };
+    setHiddenFavSections(next);
+    if (userId) {
+      await setPersisted(HIDE_KEY(userId), JSON.stringify(next));
+    }
+  };
+
+  const editItems =
+    editingKey === "album"
+      ? favouriteAlbums
+      : editingKey === "song"
+      ? favouriteSongs
+      : editingKey === "artist"
+      ? favouriteArtists
+      : [];
+
+  const handleRemoveFavourite = async (favItem) => {
+    const typeMap = { album: "Albums", song: "Tracks", artist: "Artists" };
+    const uiType = typeMap[favItem.item_type];
+    if (!uiType) return;
+
+    setFavourites((prev) =>
+      prev.filter(
+        (f) =>
+          !(
+            f.item_type === favItem.item_type &&
+            String(f.item_id) === String(favItem.item_id)
+          )
+      )
+    );
+
+    try {
+      await removeFavourite(uiType, favItem.item_id);
+      refreshFavourites?.();
+    } catch {
+      refreshFavourites?.();
+    }
+  };
 
   return (
-    <AuthGate mode="onEnter" onCancel="back" message="Log in to view your profile.">
-      <SafeAreaView style={[styles.safe, { paddingTop: 0 }]}>
-        <ScrollView
+    <AuthGate
+      mode="onEnter"
+      onCancel="back"
+      message="Log in to view your profile."
+    >
+      <SafeAreaView style={styles.safe} edges={["left", "right", "bottom"]}>
+        <View style={[styles.notchBg, { height: insetsTop }]} pointerEvents="none" />
+
+        <ProfileTopBar
+          settingsOpen={settingsOpen}
+          topBarTranslateY={topBarTranslateY}
+          totalHeight={TOPBAR_TOTAL_HEIGHT}
+          paddingTop={TOPBAR_PADDING_TOP}
+          rowHeight={TOPBAR_ROW_HEIGHT}
+          usernameTitle={usernameTitle}
+          onOpenCreate={openCreate}
+          onOpenSettings={openSettings}
+        />
+
+        <Animated.ScrollView
           style={styles.screen}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: TOPBAR_TOTAL_HEIGHT }]}
+          scrollEventThrottle={16}
+          bounces
+          alwaysBounceVertical
+          decelerationRate="fast"
+          showsVerticalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true }
+          )}
           refreshControl={
             <RefreshControl
               refreshing={loadingFavourites}
               onRefresh={refreshFavourites}
-              tintColor={COLORS.text} // iOS
+              tintColor={COLORS.text}
             />
           }
         >
-          <View style={[styles.topRightActions, { top: 25 }]}>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Feather name="share-2" size={20} color={COLORS.text} />
-            </TouchableOpacity>
+          <Animated.View style={[styles.scrollInner, { transform: [{ translateY: topBarTranslateY }] }]}>
+            <ProfileHeader
+              isGuest={isGuest}
+              avatarUrl={avatarUrl}
+              bio={bio}
+              givenName={givenName}
+              stats={stats}
+              onEditProfile={openSettings}
+              onShareProfile={() => {}}
+            />
 
-            <TouchableOpacity style={styles.iconBtn} onPress={openSettings}>
-              <Feather name="more-horizontal" size={22} color={COLORS.text} />
-            </TouchableOpacity>
-          </View>
+            <ProfileTabsBar tabs={TABS} activeTab={activeTab} setActiveTab={setActiveTab} />
 
-          {/* HEADER */}
-          <View style={styles.headerWrap}>
-            <View style={styles.headerRow}>
-              <View style={styles.leftCol}>
-                <View style={styles.avatar}>
-                  {!isGuest && avatarUrl ? (
-                    <Image
-                      source={{ uri: avatarUrl }}
-                      style={{ width: "100%", height: "100%", borderRadius: 999 }}
-                    />
-                  ) : (
-                    <Feather name="user" size={48} color={COLORS.subtext} />
-                  )}
-                </View>
-              </View>
-
-              <View style={styles.rightCol}>
-                <View style={styles.centeredRightBlock}>
-                  <Text style={styles.nameBig}>
-                    {isGuest ? "Guest" : displayName || handle || "User"}
+            {/* ✅ NEW: always-visible customize button */}
+            {!isGuest && activeTab === "Home" && (
+              <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
+                <TouchableOpacity
+                  onPress={() => setCustomizeOpen(true)}
+                  activeOpacity={0.85}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  <Text style={{ color: COLORS.subtext, fontWeight: "800", fontSize: 12 }}>
+                    Customize profile
                   </Text>
-
-                  <View style={styles.inlineRow}>
-                    <InlineStat count={isGuest ? 0 : stats.total_reviews || 0} label="reviews" />
-                    <InlineStat count={isGuest ? 0 : stats.total_ratings || 0} label="ratings" />
-                    <InlineStat count={isGuest ? 0 : stats.total_songs_listened || 0} label="listens" />
-                  </View>
-                </View>
+                </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            )}
 
-          {/* TABS */}
-          <View style={styles.tabsBar}>
-            {TABS.map((t) => (
-              <Tab key={t} label={t} active={activeTab === t} onPress={() => setActiveTab(t)} />
-            ))}
-          </View>
-
-          {/* HOME */}
-          {activeTab === "Home" && (
-            <>
-              <Section title="Favourite Albums">
-                {isGuest || showFavLoading ? (
-                  <PlaceholderSlider type="album" count={10} />
-                ) : (
-                  <FlatList
-                    horizontal
-                    data={favouriteAlbums}
-                    keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
-                    // ✅ pass full item so card can use image_url/title later
-                    // renderItem={({ item }) => <FavoriteItemCard type="album" item={item} />}
-                    renderItem={({ item }) => <FavoriteItemCard item={item} />}
-                    contentContainerStyle={styles.sliderContent}
-                    showsHorizontalScrollIndicator={false}
-                  />
+            {activeTab === "Home" && (
+              <>
+                {!hiddenFavSections.album && (
+                  <ProfileSection
+                    title="Favourite Albums"
+                    onEditPress={() => openEditOverlay("Edit Favourite Albums", "album")}
+                  >
+                    {isGuest || showFavLoading ? (
+                      <PlaceholderSlider type="album" count={3} />
+                    ) : (
+                      <FavouritesRow3
+                        items={favouriteAlbums}
+                        onPressAdd={() => openSearchOverlay("Add Favourite Album")}
+                        onPressItem={() => {}}
+                      />
+                    )}
+                  </ProfileSection>
                 )}
-              </Section>
 
-              <Section title="Favourite Songs">
-                {isGuest || showFavLoading ? (
-                  <PlaceholderSlider type="song" count={10} />
-                ) : (
-                  <FlatList
-                    horizontal
-                    data={favouriteSongs}
-                    keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
-                    // renderItem={({ item }) => <FavoriteItemCard type="song" item={item} />}
-                    renderItem={({ item }) => <FavoriteItemCard item={item} />}
-                    contentContainerStyle={styles.sliderContent}
-                    showsHorizontalScrollIndicator={false}
-                  />
+                {!hiddenFavSections.song && (
+                  <ProfileSection
+                    title="Favourite Songs"
+                    onEditPress={() => openEditOverlay("Edit Favourite Songs", "song")}
+                  >
+                    {isGuest || showFavLoading ? (
+                      <PlaceholderSlider type="song" count={3} />
+                    ) : (
+                      <FavouritesRow3
+                        items={favouriteSongs}
+                        onPressAdd={() => openSearchOverlay("Add Favourite Song")}
+                        onPressItem={() => {}}
+                      />
+                    )}
+                  </ProfileSection>
                 )}
-              </Section>
 
-              <Section title="Favourite Artists">
-                {isGuest || showFavLoading ? (
-                  <PlaceholderSlider type="artist" count={10} />
-                ) : (
-                  <FlatList
-                    horizontal
-                    data={favouriteArtists}
-                    keyExtractor={(i) => `${i.item_type}-${i.item_id}`}
-                    // renderItem={({ item }) => <FavoriteItemCard type="artist" item={item} />}
-                    renderItem={({ item }) => <FavoriteItemCard item={item} />}
-                    contentContainerStyle={styles.sliderContent}
-                    showsHorizontalScrollIndicator={false}
-                  />
+                {!hiddenFavSections.artist && (
+                  <ProfileSection
+                    title="Favourite Artists"
+                    onEditPress={() => openEditOverlay("Edit Favourite Artists", "artist")}
+                  >
+                    {isGuest || showFavLoading ? (
+                      <PlaceholderSlider type="artist" count={3} />
+                    ) : (
+                      <FavouritesRow3
+                        items={favouriteArtists}
+                        onPressAdd={() => openSearchOverlay("Add Favourite Artist")}
+                        onPressItem={() => {}}
+                      />
+                    )}
+                  </ProfileSection>
                 )}
-              </Section>
 
-              <Section title="Recent Activity" bottomMargin>
-                {isGuest ? (
-                  <View style={styles.emptyWrap}>
-                    <Text style={styles.placeholderText}>Log in to see activity.</Text>
-                  </View>
-                ) : activity.length === 0 ? (
-                  <View style={styles.emptyWrap}>
-                    <Text style={styles.placeholderText}>No activity yet.</Text>
-                  </View>
-                ) : (
-                  activity.map((a) => (
-                    <View key={a.activity_id} style={{ padding: 12 }}>
-                      <Text style={{ color: COLORS.text }}>
-                        {a.type} → {a.description}
-                      </Text>
-                      <Text style={{ color: COLORS.subtext, fontSize: 12 }}>
-                        {new Date(a.created_at).toLocaleString()}
-                      </Text>
+                <ProfileSection title="Recent Activity" bottomMargin>
+                  {isGuest ? (
+                    <View style={styles.emptyWrap}>
+                      <Text style={styles.placeholderText}>Log in to see activity.</Text>
                     </View>
-                  ))
-                )}
-              </Section>
-            </>
-          )}
-        </ScrollView>
+                  ) : activity.length === 0 ? (
+                    <View style={styles.emptyWrap}>
+                      <Text style={styles.placeholderText}>No activity yet.</Text>
+                    </View>
+                  ) : (
+                    activity.map((a) => (
+                      <View key={a.activity_id} style={{ padding: 12 }}>
+                        <Text style={{ color: COLORS.text }}>
+                          {a.type} → {a.description}
+                        </Text>
+                        <Text style={{ color: COLORS.subtext, fontSize: 12 }}>
+                          {new Date(a.created_at).toLocaleString()}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+                </ProfileSection>
+              </>
+            )}
+          </Animated.View>
+        </Animated.ScrollView>
 
-        <FooterBar router={router} insets={insets} />
+        {!settingsOpen && <FooterBar router={router} insets={insets} />}
 
         {!isGuest && settingsOpen && (
           <SettingsOverlay
@@ -316,6 +450,8 @@ export default function Profile() {
             setLocation={setLocation}
             website={website}
             setWebsite={setWebsite}
+            bio={bio}
+            setBio={setBio}
             pronoun={pronoun}
             openBioOverlay={openBioOverlay}
             openEmailOverlay={openEmailOverlay}
@@ -330,125 +466,49 @@ export default function Profile() {
             }}
           />
         )}
+
+        {createOpen && (
+          <CreateOverlay
+            anim={createAnim}
+            onClose={closeCreate}
+            onPick={(type) => {
+              closeCreate();
+              console.log("Create:", type);
+            }}
+          />
+        )}
+
+        <FavouritesSearchOverlay
+          open={favSearchOpen}
+          onClose={() => setFavSearchOpen(false)}
+          title={favOverlayTitle}
+        />
+
+        <FavouritesEditOverlay
+          open={favEditOpen}
+          onClose={() => setFavEditOpen(false)}
+          title={favOverlayTitle}
+          items={editItems}
+          onRemoveItem={handleRemoveFavourite}
+          onPressAdd={() => {
+            setFavEditOpen(false);
+            setFavSearchOpen(true);
+          }}
+          isHidden={editingKey ? !!hiddenFavSections[editingKey] : false}
+          onToggleHide={(nextHidden) => {
+            if (!editingKey) return;
+            setHidden(editingKey, nextHidden);
+          }}
+        />
+
+        {/* ✅ NEW customize overlay */}
+        <ProfileSectionsOverlay
+          open={customizeOpen}
+          onClose={() => setCustomizeOpen(false)}
+          hidden={hiddenFavSections}
+          setHidden={setHidden}
+        />
       </SafeAreaView>
     </AuthGate>
   );
 }
-
-/* ===================================================================
-   SMALL COMPONENTS
-   =================================================================== */
-
-function InlineStat({ count, label }) {
-  return (
-    <View style={styles.inlineGroup}>
-      <Text style={styles.inlineCount}>{count}</Text>
-      <Text style={styles.inlineLabel}>{label}</Text>
-    </View>
-  );
-}
-
-const Tab = memo(function Tab({ label, active, onPress }) {
-  return (
-    <TouchableOpacity style={styles.tabWrap} onPress={onPress}>
-      <View style={styles.tabPad}>
-        <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
-      </View>
-      <View style={[styles.tabUnderline, active && styles.tabUnderlineOn]} />
-    </TouchableOpacity>
-  );
-});
-
-const Section = ({ title, children, bottomMargin }) => (
-  <View style={[styles.section, bottomMargin && { marginBottom: 80 }]}>
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-    </View>
-    {children}
-  </View>
-);
-
-/* ===================================================================
-   STYLES
-   =================================================================== */
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.screen },
-  screen: { flex: 1 },
-  scrollContent: { paddingBottom: 40 },
-
-  topRightActions: {
-    position: "absolute",
-    right: 16,
-    flexDirection: "row",
-    gap: 14,
-    zIndex: 9999,
-  },
-
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 20,
-    backgroundColor: COLORS.screen,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  headerWrap: { paddingHorizontal: SIZES.pad, paddingTop: SIZES.pad },
-  headerRow: { flexDirection: "row" },
-  leftCol: { width: SIZES.avatar * AVATAR_SCALE + 10, marginRight: 12 },
-  avatar: {
-    width: SIZES.avatar * AVATAR_SCALE,
-    height: SIZES.avatar * AVATAR_SCALE,
-    borderRadius: (SIZES.avatar * AVATAR_SCALE) / 2,
-    backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-
-  rightCol: { flex: 1 },
-  centeredRightBlock: { justifyContent: "center", height: SIZES.avatar * AVATAR_SCALE },
-  nameBig: { color: COLORS.text, fontSize: 30, fontWeight: "800" },
-
-  inlineRow: { flexDirection: "row", gap: 22, marginTop: 8 },
-  inlineGroup: { alignItems: "center", minWidth: 60 },
-  inlineCount: { color: COLORS.text, fontSize: 18, fontWeight: "800" },
-  inlineLabel: { color: COLORS.subtext, fontSize: 13 },
-
-  tabsBar: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: COLORS.divider,
-    flexDirection: "row",
-    paddingHorizontal: SIZES.pad,
-    marginTop: 12,
-  },
-  tabWrap: { flex: 1, alignItems: "center" },
-  tabPad: { paddingVertical: 12 },
-  tabText: { color: COLORS.subtext, fontSize: 14, fontWeight: "600" },
-  tabTextActive: { color: COLORS.text, fontWeight: "700" },
-  tabUnderline: { height: 2, width: "100%", backgroundColor: "transparent" },
-  tabUnderlineOn: { backgroundColor: COLORS.active },
-
-  section: { marginTop: 18 },
-  sectionHeader: { paddingHorizontal: SIZES.pad, marginBottom: 10 },
-  sectionTitle: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
-
-  sliderContent: { paddingHorizontal: SIZES.pad },
-  sliderItem: { width: SIZES.cardWidth, marginRight: SIZES.cardGap },
-  cover: {
-    width: SIZES.cover,
-    height: SIZES.cover,
-    backgroundColor: COLORS.card,
-    borderRadius: SIZES.coverRadius,
-  },
-
-  placeholderLine: {
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: COLORS.card,
-    opacity: 0.7,
-    width: "80%",
-  },
-});

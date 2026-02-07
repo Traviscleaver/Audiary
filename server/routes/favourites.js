@@ -8,20 +8,23 @@ const {
   setFavourite,
   removeFavourite,
   getMyFavourites,
-  existsFavouriteBySpotifyId
+  existsFavouriteBySpotifyId,
+  countMyFavouritesByType, // ✅ make sure this exists
 } = require("../controllers/favouritesController");
 
-// List my favourites (useful for testing / future screens)
+// List my favourites
 router.get("/favorites", authRequired, getMyFavourites);
 
-// Add favourite (idempotent)
+// Add favourite
 router.post("/favorites", authRequired, setFavourite);
 
 // Remove favourite
 router.delete("/favorites", authRequired, removeFavourite);
 
-
-// Check if a favourite exists by Spotify ID (cheap)
+// Exists by Spotify ID
 router.get("/favorites/exists", authRequired, existsFavouriteBySpotifyId);
+
+// ✅ COUNT ENDPOINT (this is the one you're missing)
+router.get("/favorites/count", authRequired, countMyFavouritesByType);
 
 module.exports = router;

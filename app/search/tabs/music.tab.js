@@ -6,7 +6,7 @@ import {
   searchTracksSpotify,
 } from "../../shared/imports";
 
-const MAX_PREVIEW = 15;
+const MAX_PREVIEW = 5;
 
 export default {
   key: "Music",
