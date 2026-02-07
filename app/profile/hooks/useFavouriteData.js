@@ -1,6 +1,6 @@
+import * as SecureStore from "expo-secure-store";
 import { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
-import * as SecureStore from "expo-secure-store";
 import { useAuth } from "../../../lib/AuthContext";
 import { api } from "../../../lib/api";
 
@@ -54,7 +54,6 @@ export default function useFavouriteData() {
     const runId = ++runIdRef.current;
 
     (async () => {
-      // Step A: try cache first
       const cachedStr = await getItem(FAV_KEY(userId));
       const cached = safeJsonParse(cachedStr);
 
@@ -65,11 +64,8 @@ export default function useFavouriteData() {
       }
 
       const isFresh = cached?.expiresAt && Date.now() < cached.expiresAt;
-      if (isFresh) {
-        return;
-      }
+      if (isFresh) return;
 
-      // Step B: cache missing/expired → fetch
       setLoadingFavourites(true);
       try {
         const res = await api(`/users/${username}/favorites`);
@@ -83,7 +79,6 @@ export default function useFavouriteData() {
           JSON.stringify({ expiresAt: Date.now() + TTL_MS, data })
         );
       } catch (e) {
-        // keep whatever we had (cached or empty)
         console.log("useFavouriteData fetch error:", e);
       } finally {
         if (runId === runIdRef.current) setLoadingFavourites(false);
@@ -130,6 +125,6 @@ export default function useFavouriteData() {
     loadingFavourites,
     refresh,
     clearCache,
-    setFavourites, 
+    setFavourites,
   };
 }

@@ -17,6 +17,8 @@ export const COLORS = {
   border: "rgba(255,255,255,0.22)",
   card: "#191919",
   danger: "#ff5757",
+  buttonOff: "#7e7e7e22",
+  buttonOn: "#8f8f8fff",
 };
 
 export const SIZES = {

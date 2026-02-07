@@ -15,6 +15,7 @@ export default function BioOverlay({
   subAnim,
   closeBioOverlay,
   bio,
+  openBioOverlay,
   setBio,
   onSave, // parent callback passed from Profile.jsx (optional but recommended)
 }) {

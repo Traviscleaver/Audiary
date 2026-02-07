@@ -95,6 +95,11 @@ exports.getProfilePublic = async (req, res) => {
 
 // =======================================
 // GET /users/:username/ratings
+//
+// NOTE: ratings table no longer exists.
+// We treat "ratings" as:
+//   1) diary_entries where rating IS NOT NULL
+//   2) reviews where rating IS NOT NULL AND (content is NULL/empty)  (pure ratings)
 // =======================================
 exports.getUserRatings = async (req, res) => {
   try {
@@ -104,18 +109,41 @@ exports.getUserRatings = async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT 
-        r.song_id,
-        r.rating,
-        r.rated_at,
-        s.title AS song_title,
-        a.title AS album_title,
-        a.cover_url
-      FROM ratings r
-      JOIN songs s ON s.song_id = r.song_id
-      JOIN albums a ON a.album_id = s.album_id
-      WHERE r.user_id = $1
-      ORDER BY r.rated_at DESC
+      (
+        SELECT
+          'diary'::text AS source,
+          d.song_id,
+          d.rating,
+          d.listened_at AS created_at,
+          NULL::integer AS review_id,
+          s.title AS song_title,
+          al.title AS album_title,
+          al.cover_url
+        FROM diary_entries d
+        JOIN songs s ON s.song_id = d.song_id
+        LEFT JOIN albums al ON al.album_id = s.album_id
+        WHERE d.user_id = $1
+          AND d.rating IS NOT NULL
+      )
+      UNION ALL
+      (
+        SELECT
+          'review'::text AS source,
+          r.song_id,
+          r.rating,
+          r.created_at AS created_at,
+          r.review_id,
+          s.title AS song_title,
+          al.title AS album_title,
+          al.cover_url
+        FROM reviews r
+        JOIN songs s ON s.song_id = r.song_id
+        LEFT JOIN albums al ON al.album_id = COALESCE(r.album_id, s.album_id)
+        WHERE r.user_id = $1
+          AND r.rating IS NOT NULL
+          AND (r.content IS NULL OR BTRIM(r.content) = '')
+      )
+      ORDER BY created_at DESC
       LIMIT 100
       `,
       [user.user_id]
@@ -130,6 +158,8 @@ exports.getUserRatings = async (req, res) => {
 
 // =======================================
 // GET /users/:username/reviews
+//
+// We treat "reviews" as reviews with text content (non-empty).
 // =======================================
 exports.getUserReviews = async (req, res) => {
   try {
@@ -142,18 +172,21 @@ exports.getUserReviews = async (req, res) => {
       SELECT 
         r.review_id,
         r.song_id,
+        r.album_id,
         r.rating,
         r.content,
         r.created_at,
         r.updated_at,
 
         s.title AS song_title,
-        a.title AS album_title,
-        a.cover_url
+        al.title AS album_title,
+        al.cover_url
       FROM reviews r
       JOIN songs s ON s.song_id = r.song_id
-      JOIN albums a ON a.album_id = s.album_id
+      LEFT JOIN albums al ON al.album_id = COALESCE(r.album_id, s.album_id)
       WHERE r.user_id = $1
+        AND r.content IS NOT NULL
+        AND BTRIM(r.content) <> ''
       ORDER BY r.created_at DESC
       LIMIT 100
       `,
@@ -256,15 +289,16 @@ exports.getUserDiary = async (req, res) => {
         d.listened_at,
         d.rating,
         d.notes,
+        d.review_id,
 
         s.song_id,
         s.title AS song_title,
 
-        a.title AS album_title,
-        a.cover_url
+        al.title AS album_title,
+        al.cover_url
       FROM diary_entries d
       JOIN songs s ON s.song_id = d.song_id
-      JOIN albums a ON a.album_id = s.album_id
+      LEFT JOIN albums al ON al.album_id = s.album_id
       WHERE d.user_id = $1
       ORDER BY d.listened_at DESC
       LIMIT 200
@@ -279,9 +313,6 @@ exports.getUserDiary = async (req, res) => {
   }
 };
 
-// =======================================
-// GET /users/:username/favorites
-// =======================================
 // =======================================
 // GET /users/:username/favorites (HYDRATED)
 // =======================================
@@ -399,110 +430,138 @@ exports.getFullProfile = async (req, res) => {
     const user = await fetchUserByUsername(username);
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const [
-      stats,
-      playlists,
-      ratings,
-      reviews,
-      diary,
-      favorites,
-      activity,
-    ] = await Promise.all([
+    const [stats, playlists, ratings, reviews, diary, favorites, activity] =
+      await Promise.all([
+        pool.query(`SELECT * FROM stats WHERE user_id = $1`, [user.user_id]),
 
-      pool.query(`SELECT * FROM stats WHERE user_id = $1`, [user.user_id]),
+        pool.query(
+          `
+          SELECT p.playlist_id, p.title, p.description, p.is_public, p.created_at,
+                 COUNT(ps.song_id) AS song_count
+          FROM playlists p
+          LEFT JOIN playlist_songs ps ON ps.playlist_id = p.playlist_id
+          WHERE p.user_id = $1
+          GROUP BY p.playlist_id
+          ORDER BY p.created_at DESC
+          `,
+          [user.user_id]
+        ),
 
-      pool.query(
-        `
-        SELECT p.playlist_id, p.title, p.description, p.is_public, p.created_at,
-               COUNT(ps.song_id) AS song_count
-        FROM playlists p
-        LEFT JOIN playlist_songs ps ON ps.playlist_id = p.playlist_id
-        WHERE p.user_id = $1
-        GROUP BY p.playlist_id
-        `,
-        [user.user_id]
-      ),
+        // ratings (same logic as getUserRatings)
+        pool.query(
+          `
+          (
+            SELECT
+              'diary'::text AS source,
+              d.song_id,
+              d.rating,
+              d.listened_at AS created_at,
+              NULL::integer AS review_id,
+              s.title AS song_title,
+              al.title AS album_title,
+              al.cover_url
+            FROM diary_entries d
+            JOIN songs s ON s.song_id = d.song_id
+            LEFT JOIN albums al ON al.album_id = s.album_id
+            WHERE d.user_id = $1
+              AND d.rating IS NOT NULL
+          )
+          UNION ALL
+          (
+            SELECT
+              'review'::text AS source,
+              r.song_id,
+              r.rating,
+              r.created_at AS created_at,
+              r.review_id,
+              s.title AS song_title,
+              al.title AS album_title,
+              al.cover_url
+            FROM reviews r
+            JOIN songs s ON s.song_id = r.song_id
+            LEFT JOIN albums al ON al.album_id = COALESCE(r.album_id, s.album_id)
+            WHERE r.user_id = $1
+              AND r.rating IS NOT NULL
+              AND (r.content IS NULL OR BTRIM(r.content) = '')
+          )
+          ORDER BY created_at DESC
+          LIMIT 50
+          `,
+          [user.user_id]
+        ),
 
-      pool.query(
-        `
-        SELECT 
-          r.song_id,
-          r.rating,
-          r.rated_at,
-          s.title AS song_title,
-          a.title AS album_title,
-          a.cover_url
-        FROM ratings r
-        JOIN songs s ON s.song_id = r.song_id
-        JOIN albums a ON a.album_id = s.album_id
-        WHERE r.user_id = $1
-        ORDER BY r.rated_at DESC
-        LIMIT 50
-        `,
-        [user.user_id]
-      ),
+        // reviews (text reviews)
+        pool.query(
+          `
+          SELECT 
+            r.review_id,
+            r.song_id,
+            r.album_id,
+            r.rating,
+            r.content,
+            r.created_at,
+            r.updated_at,
 
-      pool.query(
-        `
-        SELECT 
-          r.review_id,
-          r.song_id,
-          r.rating,
-          r.content,
-          r.created_at,
+            s.title AS song_title,
+            al.title AS album_title,
+            al.cover_url
+          FROM reviews r
+          JOIN songs s ON s.song_id = r.song_id
+          LEFT JOIN albums al ON al.album_id = COALESCE(r.album_id, s.album_id)
+          WHERE r.user_id = $1
+            AND r.content IS NOT NULL
+            AND BTRIM(r.content) <> ''
+          ORDER BY r.created_at DESC
+          LIMIT 100
+          `,
+          [user.user_id]
+        ),
 
-          s.title AS song_title,
-          a.title AS album_title,
-          a.cover_url
-        FROM reviews r
-        JOIN songs s ON s.song_id = r.song_id
-        JOIN albums a ON a.album_id = s.album_id
-        WHERE r.user_id = $1
-        ORDER BY r.created_at DESC
-        `,
-        [user.user_id]
-      ),
+        pool.query(
+          `
+          SELECT 
+            d.entry_id,
+            d.listened_at,
+            d.rating,
+            d.notes,
+            d.review_id,
 
-      pool.query(
-        `
-        SELECT 
-          d.entry_id,
-          d.listened_at,
-          d.rating,
-          d.notes,
-          s.song_id,
-          s.title AS song_title,
-          a.cover_url
-        FROM diary_entries d
-        JOIN songs s ON s.song_id = d.song_id
-        JOIN albums a ON a.album_id = s.album_id
-        WHERE d.user_id = $1
-        ORDER BY d.listened_at DESC
-        LIMIT 200
-        `,
-        [user.user_id]
-      ),
+            s.song_id,
+            s.title AS song_title,
 
-      pool.query(
-        `
-        SELECT item_type, item_id, added_at
-        FROM favorites
-        WHERE user_id = $1
-        `,
-        [user.user_id]
-      ),
+            al.title AS album_title,
+            al.cover_url
+          FROM diary_entries d
+          JOIN songs s ON s.song_id = d.song_id
+          LEFT JOIN albums al ON al.album_id = s.album_id
+          WHERE d.user_id = $1
+          ORDER BY d.listened_at DESC
+          LIMIT 200
+          `,
+          [user.user_id]
+        ),
 
-      pool.query(
-        `
-        SELECT activity_id, type, target_id, description, created_at
-        FROM activities
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT 50
-        `,
-        [user.user_id]
-      ),
-    ]);
+        pool.query(
+          `
+          SELECT item_type, item_id, added_at
+          FROM favorites
+          WHERE user_id = $1
+          ORDER BY added_at DESC
+          `,
+          [user.user_id]
+        ),
+
+        pool.query(
+          `
+          SELECT activity_id, type, target_id, description, created_at
+          FROM activities
+          WHERE user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 50
+          `,
+          [user.user_id]
+        ),
+      ]);
 
     return res.json({
       user,
@@ -574,6 +633,9 @@ exports.updateProfile = async (req, res) => {
       [userId, first_name, last_name, bio, location, website, banner_url]
     );
 
+    // optional: keep stats fresh after profile update
+    // await recalcUserStats(userId);
+
     return res.json({
       message: "Profile updated successfully",
       user: updatedUser.rows[0],
@@ -581,30 +643,54 @@ exports.updateProfile = async (req, res) => {
   } catch (err) {
     console.error("updateProfile error:", err);
 
+    // Unique violation (email/username). Constraint names may differ in Supabase.
     if (err.code === "23505") {
-      if (err.constraint === "users_email_lower_idx") {
-        return res.status(400).json({ error: "Email already taken" });
-      }
-      if (err.constraint === "users_username_lower_idx") {
-        return res.status(400).json({ error: "Username already taken" });
-      }
+      return res.status(400).json({ error: "Email or username already taken" });
     }
 
     return res.status(500).json({ error: "Internal server error" });
   }
 };
 
-
+// ===============================
+// Helper: Recalculate stats
+//
+// NOTE: ratings table removed.
+// We compute:
+//   total_reviews = reviews with non-empty content
+//   total_ratings = (diary ratings) + (review ratings with empty content)
+//   avg_rating = avg of all ratings from both sources
+// ===============================
 async function recalcUserStats(userId) {
-  await pool.query(`
+  await pool.query(
+    `
+    WITH diary_ratings AS (
+      SELECT rating::numeric AS rating
+      FROM diary_entries
+      WHERE user_id = $1 AND rating IS NOT NULL
+    ),
+    pure_review_ratings AS (
+      SELECT rating::numeric AS rating
+      FROM reviews
+      WHERE user_id = $1
+        AND rating IS NOT NULL
+        AND (content IS NULL OR BTRIM(content) = '')
+    ),
+    all_ratings AS (
+      SELECT rating FROM diary_ratings
+      UNION ALL
+      SELECT rating FROM pure_review_ratings
+    )
     UPDATE stats SET
-      total_reviews = (SELECT COUNT(*) FROM reviews WHERE user_id = $1),
-      total_ratings = (SELECT COUNT(*) FROM ratings WHERE user_id = $1),
-      avg_rating = (
-        SELECT COALESCE(AVG(rating), 0)
-        FROM ratings
+      total_reviews = (
+        SELECT COUNT(*)
+        FROM reviews
         WHERE user_id = $1
+          AND content IS NOT NULL
+          AND BTRIM(content) <> ''
       ),
+      total_ratings = (SELECT COUNT(*) FROM all_ratings),
+      avg_rating = (SELECT COALESCE(AVG(rating), 0) FROM all_ratings),
       total_songs_listened = (
         SELECT COUNT(*) FROM diary_entries WHERE user_id = $1
       ),
@@ -618,5 +704,7 @@ async function recalcUserStats(userId) {
       ),
       last_updated = NOW()
     WHERE user_id = $1
-  `, [userId]);
+    `,
+    [userId]
+  );
 }

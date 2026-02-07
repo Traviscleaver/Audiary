@@ -1,3 +1,4 @@
+// routes/user.js (or whatever you named this file)
 const express = require("express");
 const router = express.Router();
 
@@ -5,8 +6,8 @@ const authRequired = require("../middleware/authRequired");
 const authOptional = require("../middleware/authOptional");
 
 const {
-  getProfileSelf,         // GET /profile (self)
-  getProfilePublic,       // GET /users/:username/profile (public)
+  getProfileSelf, // GET /profile (self)
+  getProfilePublic, // GET /users/:username/profile (public)
 
   getUserRatings,
   getUserReviews,
@@ -16,8 +17,8 @@ const {
   getUserActivity,
   getUserStats,
 
-  getFullProfile,         // GET /users/:username/full
-  updateProfile,          // PUT /profile (self edit)
+  getFullProfile, // GET /users/:username/full
+  updateProfile, // PUT /profile (self edit)
 
   searchUsers,
 } = require("../controllers/userController");
@@ -26,16 +27,14 @@ const {
   followUser,
   unfollowUser,
   getFollowers,
-  getFollowing
-} = require("../controllers/followController");  // <-- you'll get this file next
-
+  getFollowing,
+} = require("../controllers/followController");
 
 /* =========================================
    PROFILE ROUTES
    ========================================= */
 
 router.get("/__ping", (req, res) => res.json({ ok: true }));
-
 
 // Current logged-in user's profile
 router.get("/profile", authRequired, getProfileSelf);
@@ -46,15 +45,11 @@ router.put("/profile", authRequired, updateProfile);
 // Search users
 router.get("/users/search", authOptional, searchUsers);
 
-
 // Public profile lookup by username
 router.get("/users/:username/profile", authOptional, getProfilePublic);
 
-
-
-
 /* =========================================
-   FOLLOW SYSTEM (NEW)
+   FOLLOW SYSTEM
    ========================================= */
 
 // Follow someone
@@ -69,12 +64,13 @@ router.get("/users/:username/followers", authOptional, getFollowers);
 // Get who someone is following
 router.get("/users/:username/following", authOptional, getFollowing);
 
-
 /* =========================================
    USER DATA SUB-ROUTES
    ========================================= */
 
+// "Ratings" now come from diary_entries.rating + rating-only reviews (no ratings table)
 router.get("/users/:username/ratings", authOptional, getUserRatings);
+
 router.get("/users/:username/reviews", authOptional, getUserReviews);
 router.get("/users/:username/playlists", authOptional, getUserPlaylists);
 router.get("/users/:username/diary", authOptional, getUserDiary);
@@ -82,12 +78,10 @@ router.get("/users/:username/favorites", authOptional, getUserFavorites);
 router.get("/users/:username/activity", authOptional, getUserActivity);
 router.get("/users/:username/stats", authOptional, getUserStats);
 
-
 /* =========================================
    OPTIONAL: FULL PROFILE BUNDLE
    ========================================= */
 
 router.get("/users/:username/full", authOptional, getFullProfile);
-
 
 module.exports = router;

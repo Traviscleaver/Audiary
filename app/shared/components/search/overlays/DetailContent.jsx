@@ -1,4 +1,5 @@
 // app/shared/components/search/overlays/DetailContent.jsx
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   COLORS,
@@ -9,14 +10,14 @@ import {
   ScrollView,
   SIZES,
   Text,
+  Alert,
   TouchableOpacity,
   useSafeAreaInsets,
   View,
 } from "../../../imports";
-import { ensureAlbum, ensureArtist, ensureTrack, favouritesExistsBySpotify  } from "../../../../../lib/api";
-import { Alert } from "react-native";
+import { favouritesExistsBySpotify  } from "../../../../../lib/api";
 import FavoriteButton from "../../favouriteButton";
-import React, { useEffect, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 
 export default function DetailContent({
   type,
@@ -30,6 +31,7 @@ export default function DetailContent({
   openSubDetail,
 }) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   if (!item) return null;
 
@@ -51,6 +53,30 @@ export default function DetailContent({
 
   // small in-memory cache so it doesn't spam when rerendering
   const existsCacheRef = useRef(new Map()); // key -> { exists, item_id, at }
+
+const canAddFavouriteOrAlert = async () => {
+  try {
+    const r = await favouritesCountByType(type);
+    if ((r?.count ?? 0) >= 3) {
+      Alert.alert(
+        "Favourite limit reached",
+        `You can only have 3 favourite ${
+          type === "Tracks" ? "songs" : type === "Albums" ? "albums" : "artists"
+        }.`
+      );
+      return false;
+    }
+    return true;
+  } catch (e) {
+    // ✅ If endpoint doesn't exist yet (404), don't block
+    const msg = String(e?.message || "");
+    if (msg.includes("404")) return true;
+
+    // Otherwise also don't block (server will enforce max)
+    return true;
+  }
+};
+
 
   useEffect(() => {
     let cancelled = false;
@@ -91,42 +117,33 @@ export default function DetailContent({
   }, [type, spotifyId]);
 
 
-  const onRatePress = async () => {
+  const onRatePress = () => {
     try {
       if (!spotifyId) return;
 
-      // Tracks → ensure song+album+artist
       if (type === "Tracks") {
-        const res = await ensureTrack(spotifyId);
-
-        // res example: { song_id, album_id, artist_id, existed }
-        Alert.alert(
-          "Saved to database ✅",
-          `Song ID: ${res.song_id}\n${res.existed ? "Already existed" : "Imported from Spotify"}`
-        );
+        router.push({
+          pathname: "/review",
+          params: { targetType: "song", spotifyId },
+        });
         return;
       }
 
-      // Albums → ensure album+artist only (no songs)
       if (type === "Albums") {
-        const res = await ensureAlbum(spotifyId);
-
-        Alert.alert(
-          "Saved to database ✅",
-          `Album ID: ${res.album_id}\n${res.existed ? "Already existed" : "Imported from Spotify"}`
-        );
+        router.push({
+          pathname: "/review",
+          params: { targetType: "album", spotifyId },
+        });
         return;
       }
 
-      // Artists (for now) — just tell them it’s not wired
       Alert.alert("Not ready yet", "Artist import not wired yet.");
     } catch (err) {
       console.log("onRatePress error:", err);
-      Alert.alert("Couldn’t save", "Your server couldn’t import this item. Check logs.");
+      Alert.alert("Couldn’t open", "Something went wrong opening the review screen.");
     }
   };
 
-  // ✅ space so the floating back button never covers content
   const topPad = insets.top + SIZES.navHeight + 10;
 
   return (
@@ -239,6 +256,10 @@ export default function DetailContent({
           type={type}
           spotifyId={spotifyId}
           initialFavorite={initialFavorite}
+          beforeToggle={async (next) => {
+            if (next === true) return await canAddFavouriteOrAlert();
+            return true;
+          }}
           onToggle={(next) => setInitialFavorite(next)}
         />
       </View>

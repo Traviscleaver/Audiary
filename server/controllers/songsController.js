@@ -1,9 +1,20 @@
-// controllers/songController.js
+// server/controllers/songController.js
 const { pool } = require("../db");
 
-// =======================================
-// Helper: Fetch song by id (with album + artist)
-// =======================================
+/**
+ * We deleted the `ratings` table.
+ * Ratings are now derived from `reviews.rating` (nullable).
+ *
+ * Conventions:
+ * - "ratings_count" = number of reviews with rating NOT NULL
+ * - "avg_rating"    = average of reviews.rating (rating NOT NULL)
+ * - "reviews_count" = total number of reviews (including blank rating/content)
+ */
+
+/* =======================================
+   Helper: Fetch song by id (with album + artist)
+   - Adds camelCase aliases for client convenience
+   ======================================= */
 async function fetchSongById(songId) {
   const result = await pool.query(
     `
@@ -24,15 +35,18 @@ async function fetchSongById(songId) {
       a.title AS album_title,
       a.release_year,
       a.cover_url,
+      a.cover_url AS "coverUrl",
       a.total_tracks,
 
       ar.artist_id,
       ar.name AS artist_name,
       ar.image_url AS artist_image_url,
+      ar.image_url AS "artistImageUrl",
 
-      (SELECT COUNT(*) FROM ratings WHERE song_id = s.song_id) AS ratings_count,
-      (SELECT COALESCE(AVG(rating), 0) FROM ratings WHERE song_id = s.song_id) AS avg_rating,
-      (SELECT COUNT(*) FROM reviews WHERE song_id = s.song_id) AS reviews_count
+      -- ratings derived from reviews
+      (SELECT COUNT(*) FROM reviews r WHERE r.song_id = s.song_id AND r.rating IS NOT NULL) AS ratings_count,
+      (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.song_id = s.song_id AND r.rating IS NOT NULL) AS avg_rating,
+      (SELECT COUNT(*) FROM reviews r WHERE r.song_id = s.song_id) AS reviews_count
 
     FROM songs s
     LEFT JOIN albums a ON a.album_id = s.album_id
@@ -46,9 +60,9 @@ async function fetchSongById(songId) {
   return result.rows[0];
 }
 
-// =======================================
-// Helper: Fetch song by spotify_id (optional)
-// =======================================
+/* =======================================
+   Helper: Fetch song by spotify_id
+   ======================================= */
 async function fetchSongBySpotifyId(spotifyId) {
   const result = await pool.query(
     `
@@ -69,14 +83,18 @@ async function fetchSongBySpotifyId(spotifyId) {
       a.title AS album_title,
       a.release_year,
       a.cover_url,
+      a.cover_url AS "coverUrl",
       a.total_tracks,
 
       ar.artist_id,
       ar.name AS artist_name,
+      ar.image_url AS artist_image_url,
+      ar.image_url AS "artistImageUrl",
 
-      (SELECT COUNT(*) FROM ratings WHERE song_id = s.song_id) AS ratings_count,
-      (SELECT COALESCE(AVG(rating), 0) FROM ratings WHERE song_id = s.song_id) AS avg_rating,
-      (SELECT COUNT(*) FROM reviews WHERE song_id = s.song_id) AS reviews_count
+      (SELECT COUNT(*) FROM reviews r WHERE r.song_id = s.song_id AND r.rating IS NOT NULL) AS ratings_count,
+      (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.song_id = s.song_id AND r.rating IS NOT NULL) AS avg_rating,
+      (SELECT COUNT(*) FROM reviews r WHERE r.song_id = s.song_id) AS reviews_count
+
     FROM songs s
     LEFT JOIN albums a ON a.album_id = s.album_id
     LEFT JOIN artists ar ON ar.artist_id = a.artist_id
@@ -89,10 +107,10 @@ async function fetchSongBySpotifyId(spotifyId) {
   return result.rows[0];
 }
 
-// =======================================
-// GET /songs/:songId
-// Public song details
-// =======================================
+/* =======================================
+   GET /songs/:songId
+   Public song details
+   ======================================= */
 exports.getSongById = async (req, res) => {
   try {
     const songId = Number(req.params.songId);
@@ -110,13 +128,13 @@ exports.getSongById = async (req, res) => {
   }
 };
 
-// =======================================
-// GET /songs/spotify/:spotifyId
-// Public song details by spotify id
-// =======================================
+/* =======================================
+   GET /songs/spotify/:spotifyId
+   Public song details by spotify id
+   ======================================= */
 exports.getSongBySpotifyId = async (req, res) => {
   try {
-    const spotifyId = req.params.spotifyId;
+    const spotifyId = String(req.params.spotifyId || "").trim();
     if (!spotifyId) return res.status(400).json({ error: "Missing spotifyId" });
 
     const song = await fetchSongBySpotifyId(spotifyId);
@@ -129,9 +147,11 @@ exports.getSongBySpotifyId = async (req, res) => {
   }
 };
 
-// =======================================
-// GET /songs/:songId/ratings
-// =======================================
+/* =======================================
+   GET /songs/:songId/ratings
+   (Compatibility endpoint)
+   - ratings table removed; derive “ratings feed” from reviews where rating NOT NULL
+   ======================================= */
 exports.getSongRatings = async (req, res) => {
   try {
     const songId = Number(req.params.songId);
@@ -145,18 +165,20 @@ exports.getSongRatings = async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        r.user_id,
-        r.song_id,
-        r.rating,
-        r.rated_at,
+        rv.review_id,
+        rv.user_id,
+        rv.song_id,
+        rv.rating,
+        rv.created_at AS rated_at,
 
         u.username,
         u.display_name,
         u.avatar_url
-      FROM ratings r
-      JOIN users u ON u.user_id = r.user_id
-      WHERE r.song_id = $1
-      ORDER BY r.rated_at DESC
+      FROM reviews rv
+      JOIN users u ON u.user_id = rv.user_id
+      WHERE rv.song_id = $1
+        AND rv.rating IS NOT NULL
+      ORDER BY rv.created_at DESC
       LIMIT 200
       `,
       [songId]
@@ -169,9 +191,9 @@ exports.getSongRatings = async (req, res) => {
   }
 };
 
-// =======================================
-// GET /songs/:songId/reviews
-// =======================================
+/* =======================================
+   GET /songs/:songId/reviews
+   ======================================= */
 exports.getSongReviews = async (req, res) => {
   try {
     const songId = Number(req.params.songId);
@@ -188,6 +210,7 @@ exports.getSongReviews = async (req, res) => {
         r.review_id,
         r.user_id,
         r.song_id,
+        r.album_id,
         r.rating,
         r.content,
         r.created_at,
@@ -196,7 +219,6 @@ exports.getSongReviews = async (req, res) => {
         u.username,
         u.display_name,
         u.avatar_url
-
       FROM reviews r
       JOIN users u ON u.user_id = r.user_id
       WHERE r.song_id = $1
@@ -213,10 +235,12 @@ exports.getSongReviews = async (req, res) => {
   }
 };
 
-// =======================================
-// GET /songs/:songId/diary
-// (who listened + notes) — public feed-ish
-// =======================================
+/* =======================================
+   GET /songs/:songId/diary
+   (public feed-ish)
+   Note: diary_entries still has its own `rating` column in your schema.
+   You can decide later whether to migrate diary to reference reviews only.
+   ======================================= */
 exports.getSongDiaryEntries = async (req, res) => {
   try {
     const songId = Number(req.params.songId);
@@ -241,7 +265,6 @@ exports.getSongDiaryEntries = async (req, res) => {
         u.username,
         u.display_name,
         u.avatar_url
-
       FROM diary_entries d
       JOIN users u ON u.user_id = d.user_id
       WHERE d.song_id = $1
@@ -258,9 +281,9 @@ exports.getSongDiaryEntries = async (req, res) => {
   }
 };
 
-// =======================================
-// GET /songs/:songId/stats
-// =======================================
+/* =======================================
+   GET /songs/:songId/stats
+   ======================================= */
 exports.getSongStats = async (req, res) => {
   try {
     const songId = Number(req.params.songId);
@@ -271,14 +294,13 @@ exports.getSongStats = async (req, res) => {
     const song = await fetchSongById(songId);
     if (!song) return res.status(404).json({ error: "Song not found" });
 
-    // stats come from subqueries (same as helper), but keeping a dedicated endpoint
     const stats = await pool.query(
       `
       SELECT
-        (SELECT COUNT(*) FROM ratings WHERE song_id = $1) AS ratings_count,
-        (SELECT COALESCE(AVG(rating), 0) FROM ratings WHERE song_id = $1) AS avg_rating,
-        (SELECT COUNT(*) FROM reviews WHERE song_id = $1) AS reviews_count,
-        (SELECT COUNT(*) FROM diary_entries WHERE song_id = $1) AS diary_count
+        (SELECT COUNT(*) FROM reviews r WHERE r.song_id = $1 AND r.rating IS NOT NULL) AS ratings_count,
+        (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.song_id = $1 AND r.rating IS NOT NULL) AS avg_rating,
+        (SELECT COUNT(*) FROM reviews r WHERE r.song_id = $1) AS reviews_count,
+        (SELECT COUNT(*) FROM diary_entries d WHERE d.song_id = $1) AS diary_count
       `,
       [songId]
     );
@@ -290,10 +312,10 @@ exports.getSongStats = async (req, res) => {
   }
 };
 
-// =======================================
-// GET /songs/:songId/full
-// Song + recent ratings + recent reviews + recent diary
-// =======================================
+/* =======================================
+   GET /songs/:songId/full
+   Song + recent (derived) ratings + reviews + diary
+   ======================================= */
 exports.getSongFull = async (req, res) => {
   try {
     const songId = Number(req.params.songId);
@@ -305,20 +327,23 @@ exports.getSongFull = async (req, res) => {
     if (!song) return res.status(404).json({ error: "Song not found" });
 
     const [ratings, reviews, diary] = await Promise.all([
+      // "ratings" derived from reviews (rating-only feed)
       pool.query(
         `
         SELECT
-          r.user_id,
-          r.song_id,
-          r.rating,
-          r.rated_at,
+          rv.review_id,
+          rv.user_id,
+          rv.song_id,
+          rv.rating,
+          rv.created_at AS rated_at,
           u.username,
           u.display_name,
           u.avatar_url
-        FROM ratings r
-        JOIN users u ON u.user_id = r.user_id
-        WHERE r.song_id = $1
-        ORDER BY r.rated_at DESC
+        FROM reviews rv
+        JOIN users u ON u.user_id = rv.user_id
+        WHERE rv.song_id = $1
+          AND rv.rating IS NOT NULL
+        ORDER BY rv.created_at DESC
         LIMIT 50
         `,
         [songId]
@@ -330,6 +355,7 @@ exports.getSongFull = async (req, res) => {
           rv.review_id,
           rv.user_id,
           rv.song_id,
+          rv.album_id,
           rv.rating,
           rv.content,
           rv.created_at,
@@ -371,7 +397,7 @@ exports.getSongFull = async (req, res) => {
 
     return res.json({
       song,
-      ratings: ratings.rows,
+      ratings: ratings.rows, // derived from reviews
       reviews: reviews.rows,
       diary: diary.rows,
     });
@@ -381,10 +407,10 @@ exports.getSongFull = async (req, res) => {
   }
 };
 
-// =======================================
-// POST /songs
-// Create a song (basic insert; useful for seeding/import)
-// =======================================
+/* =======================================
+   POST /songs
+   Basic insert; useful for seeding/import
+   ======================================= */
 exports.createSong = async (req, res) => {
   try {
     const {
@@ -431,20 +457,17 @@ exports.createSong = async (req, res) => {
     return res.status(201).json({ message: "Song created", song });
   } catch (err) {
     console.error("createSong error:", err);
-
-    // Unique violation (spotify_id, mbid)
     if (err.code === "23505") {
       return res.status(400).json({ error: "Song already exists" });
     }
-
     return res.status(500).json({ error: "Internal server error" });
   }
 };
 
-// =======================================
-// PUT /songs/:songId
-// Update song fields
-// =======================================
+/* =======================================
+   PUT /songs/:songId
+   Update song fields
+   ======================================= */
 exports.updateSong = async (req, res) => {
   try {
     const songId = Number(req.params.songId);
@@ -502,9 +525,9 @@ exports.updateSong = async (req, res) => {
   }
 };
 
-// =======================================
-// DELETE /songs/:songId
-// =======================================
+/* =======================================
+   DELETE /songs/:songId
+   ======================================= */
 exports.deleteSong = async (req, res) => {
   try {
     const songId = Number(req.params.songId);
@@ -516,10 +539,13 @@ exports.deleteSong = async (req, res) => {
     if (!existing) return res.status(404).json({ error: "Song not found" });
 
     await pool.query(`DELETE FROM songs WHERE song_id = $1`, [songId]);
-
     return res.json({ message: "Song deleted" });
   } catch (err) {
     console.error("deleteSong error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// Export helpers if you want to reuse them elsewhere
+exports._fetchSongById = fetchSongById;
+exports._fetchSongBySpotifyId = fetchSongBySpotifyId;
