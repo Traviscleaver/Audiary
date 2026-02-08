@@ -46,16 +46,13 @@ import {
   getMyProfileBlocks,
   createProfileBlock,
   reorderProfileBlocks,
-  setProfileBlockDisplay
+  setProfileBlockDisplay,
 } from "../../lib/api.js";
-
 
 const TABS = ["Home", "Reviews", "Lists"];
 
 // Keeping your old local hide for now (later you can switch to server display toggle)
 const HIDE_KEY = (userId) => `profile_hidden_fav_sections_v1_${userId}`;
-
-
 
 async function getPersisted(key) {
   if (Platform.OS === "web") return localStorage.getItem(key);
@@ -89,6 +86,7 @@ export default function Profile() {
     ratings,
     diary,
     activity,
+    refresh: refreshProfileData,
   } = useProfileData();
 
   const {
@@ -105,7 +103,7 @@ export default function Profile() {
   const isGuest = status !== "logged-in";
   const userId = profile?.user_id || null;
 
-  // ===== USER STATE =====
+  // ===== USER EDIT/DRAFT STATE (SettingsOverlay uses these) =====
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -222,7 +220,12 @@ export default function Profile() {
   });
 
   useEffect(() => {
-    if (!userId) return;
+    // reset in-memory when logged out / switching users
+    if (!userId) {
+      setHiddenFavSections({ album: false, song: false, artist: false });
+      return;
+    }
+
     (async () => {
       const raw = await getPersisted(HIDE_KEY(userId));
       const parsed = safeParse(raw);
@@ -278,9 +281,10 @@ export default function Profile() {
   };
 
   useEffect(() => {
+    if (status === "checking") return; // avoid noisy calls during hydration
     refreshBlocks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGuest]);
+  }, [isGuest, status]);
 
   // =========================================================
   // ✅ Categorize favourites (rank-aware; respects item display)
@@ -298,31 +302,36 @@ export default function Profile() {
     };
 
     setFavouriteAlbums(
-      favourites
+      (favourites || [])
         .filter((f) => f.item_type === "album" && f.display !== false)
+        .slice()
         .sort(byRank)
         .slice(0, 3)
     );
 
     setFavouriteSongs(
-      favourites
+      (favourites || [])
         .filter((f) => f.item_type === "song" && f.display !== false)
+        .slice()
         .sort(byRank)
         .slice(0, 3)
     );
 
     setFavouriteArtists(
-      favourites
+      (favourites || [])
         .filter((f) => f.item_type === "artist" && f.display !== false)
+        .slice()
         .sort(byRank)
         .slice(0, 3)
     );
   }, [favourites]);
 
   const showFavLoading =
-    (loadingFavourites || loadingExtra) && favourites.length === 0;
+    (loadingFavourites || loadingExtra) && (favourites || []).length === 0;
 
-  const usernameTitle = isGuest ? "Guest" : handle || "User";
+  const usernameTitle = isGuest
+    ? "Guest"
+    : handle || profile?.username || "User";
 
   const editItems =
     editingKey === "album"
@@ -339,7 +348,7 @@ export default function Profile() {
     if (!uiType) return;
 
     setFavourites((prev) =>
-      prev.filter(
+      (prev || []).filter(
         (f) =>
           !(
             f.item_type === favItem.item_type &&
@@ -415,7 +424,9 @@ export default function Profile() {
         <ProfileSection
           key={block.profile_block_id}
           title="Favourite Artists"
-          onEditPress={() => openEditOverlay("Edit Favourite Artists", "artist")}
+          onEditPress={() =>
+            openEditOverlay("Edit Favourite Artists", "artist")
+          }
         >
           {isGuest || showFavLoading ? (
             <PlaceholderSlider type="artist" count={3} />
@@ -434,9 +445,16 @@ export default function Profile() {
   };
 
   return (
-    <AuthGate mode="onEnter" onCancel="back" message="Log in to view your profile.">
+    <AuthGate
+      mode="onEnter"
+      onCancel="back"
+      message="Log in to view your profile."
+    >
       <SafeAreaView style={styles.safe} edges={["left", "right", "bottom"]}>
-        <View style={[styles.notchBg, { height: insetsTop }]} pointerEvents="none" />
+        <View
+          style={[styles.notchBg, { height: insetsTop }]}
+          pointerEvents="none"
+        />
 
         <ProfileTopBar
           settingsOpen={settingsOpen}
@@ -451,7 +469,10 @@ export default function Profile() {
 
         <Animated.ScrollView
           style={styles.screen}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: TOPBAR_TOTAL_HEIGHT }]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: TOPBAR_TOTAL_HEIGHT },
+          ]}
           scrollEventThrottle={16}
           bounces
           alwaysBounceVertical
@@ -463,26 +484,44 @@ export default function Profile() {
           )}
           refreshControl={
             <RefreshControl
-              refreshing={loadingFavourites || loadingBlocks}
+              refreshing={loadingFavourites || loadingBlocks || loadingExtra}
               onRefresh={async () => {
-                await Promise.all([refreshFavourites?.(), refreshBlocks()]);
+                await Promise.all([
+                  refreshProfileData?.(),
+                  refreshFavourites?.(),
+                  refreshBlocks(),
+                ]);
               }}
               tintColor={COLORS.text}
             />
           }
         >
-          <Animated.View style={[styles.scrollInner, { transform: [{ translateY: topBarTranslateY }] }]}>
+          <Animated.View
+            style={[
+              styles.scrollInner,
+              { transform: [{ translateY: topBarTranslateY }] },
+            ]}
+          >
             <ProfileHeader
               isGuest={isGuest}
-              avatarUrl={avatarUrl}
-              bio={bio}
-              givenName={givenName}
+              // Use local state so changes show instantly after Settings save
+              avatarUrl={avatarUrl || profile?.avatar_url || ""}
+              bio={bio || profile?.bio || ""}
+              givenName={
+                givenName ||
+                profile?.display_name?.split(/\s+/)?.[0] ||
+                ""
+              }
               stats={stats}
               onEditProfile={openSettings}
               onShareProfile={() => {}}
             />
 
-            <ProfileTabsBar tabs={TABS} activeTab={activeTab} setActiveTab={setActiveTab} />
+            <ProfileTabsBar
+              tabs={TABS}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
 
             {!isGuest && activeTab === "Home" && (
               <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
@@ -491,7 +530,13 @@ export default function Profile() {
                   activeOpacity={0.85}
                   style={{ alignSelf: "flex-start" }}
                 >
-                  <Text style={{ color: COLORS.subtext, fontWeight: "800", fontSize: 12 }}>
+                  <Text
+                    style={{
+                      color: COLORS.subtext,
+                      fontWeight: "800",
+                      fontSize: 12,
+                    }}
+                  >
                     Customize profile
                   </Text>
                 </TouchableOpacity>
@@ -500,8 +545,6 @@ export default function Profile() {
 
             {activeTab === "Home" && (
               <>
-                {/* If still empty after attempted default creation */}
-                {/* While loading blocks (initial), show placeholders instead of "empty" */}
                 {!isGuest && !blocksReady ? (
                   <>
                     <ProfileSection title="Favourite Albums">
@@ -557,11 +600,14 @@ export default function Profile() {
             avatarUrl={avatarUrl}
             setAvatarUrl={setAvatarUrl}
             onSave={(user) => {
-              setHandle(user.username);
-              setEmail(user.email);
+              // keep local UI in sync immediately
+              setHandle(user.username || "");
+              setEmail(user.email || "");
               setDisplayName(user.display_name || "");
               setBio(user.bio || "");
               setAvatarUrl(user.avatar_url || "");
+              // also refresh server-backed datasets if needed
+              refreshProfileData?.();
             }}
           />
         )}
@@ -598,15 +644,12 @@ export default function Profile() {
             if (!editingKey) return;
             setHidden(editingKey, nextHidden);
           }}
-
-          // ✅ NEW: used by the draggable overlay to update UI instantly
           onLocalReorder={(updatedItems) => {
-            // updatedItems = the 1–3 items for THIS bucket with new ranks
             setFavourites((prev) => {
               const map = new Map(
                 updatedItems.map((x) => [`${x.item_type}-${x.item_id}`, x.rank])
               );
-              return prev.map((f) => {
+              return (prev || []).map((f) => {
                 const k = `${f.item_type}-${f.item_id}`;
                 if (!map.has(k)) return f;
                 return { ...f, rank: map.get(k) };
@@ -614,8 +657,6 @@ export default function Profile() {
             });
           }}
         />
-
-
 
         <ProfileSectionsOverlay
           open={customizeOpen}
@@ -625,7 +666,6 @@ export default function Profile() {
           onReorder={reorderProfileBlocks}
           onToggleDisplay={setProfileBlockDisplay}
         />
-
       </SafeAreaView>
     </AuthGate>
   );

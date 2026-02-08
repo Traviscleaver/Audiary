@@ -36,6 +36,39 @@ async function fetchUserByUsername(username) {
 }
 
 // ===============================
+// GET /users/:username/picture
+// ===============================
+exports.getUserPicture = async (req, res) => {
+  try {
+    const username = String(req.params.username || "").trim();
+    if (!username) return res.status(400).json({ error: "Username is required" });
+
+    const result = await pool.query(
+      `
+      SELECT u.user_id, u.avatar_url
+      FROM users u
+      WHERE LOWER(u.username) = LOWER($1)
+      LIMIT 1
+      `,
+      [username]
+    );
+
+    const row = result.rows[0];
+    if (!row) return res.status(404).json({ error: "User not found" });
+
+    return res.json({
+      user_id: row.user_id,
+      avatar_url: row.avatar_url || null,
+    });
+  } catch (err) {
+    console.error("getUserPicture error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+
+// ===============================
 // GET /profile (self)
 // ===============================
 exports.getProfileSelf = async (req, res) => {

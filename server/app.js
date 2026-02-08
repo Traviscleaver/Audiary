@@ -13,6 +13,7 @@ const favouritesRoutes = require("./routes/favourites");
 const reviewRoutes = require("./routes/reviews");
 const spotifyRoutes = require("./routes/spotify");
 const profileBlocksRoutes = require("./routes/profileBlocks");
+const authRequired = require("./routes/profileAvatar");
 
 const { pool } = require("./db");
 
@@ -34,6 +35,8 @@ app.use("/", ensureRoutes);
 app.use("/", favouritesRoutes);
 app.use("/", profileBlocksRoutes);
 app.use("/reviews", reviewRoutes);
+app.use("/", authRequired);
+
 
 // ===== DB TEST ROUTE =====
 app.get("/db-test", async (req, res) => {

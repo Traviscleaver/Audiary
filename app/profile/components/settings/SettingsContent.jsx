@@ -1,19 +1,25 @@
 // app/profile/components/settings/SettingsContent.jsx
 import {
-    COLORS,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  COLORS,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "../../../shared/imports";
 import { overlayStyles as styles } from "./styles";
+import ProfilePictureButton from "./ProfilePictureButton";
 
 /**
  * Pure content (no animation, no API).
  * Just renders the rows.
  */
 export default function SettingsContent({
+  // NEW:
+  profileImageUri,
+  onUpdateProfileImage, // async (uri) => void
+  onRemoveProfileImage, // async () => void
+
   givenName,
   setGivenName,
   familyName,
@@ -40,6 +46,13 @@ export default function SettingsContent({
 }) {
   return (
     <ScrollView style={styles.sheetScroll}>
+      {/* Profile Picture (Instagram style) */}
+      <ProfilePictureButton
+        uri={profileImageUri}
+        onUpdate={onUpdateProfileImage}
+        onRemove={onRemoveProfileImage}
+      />
+
       {/* PROFILE */}
       <Text style={[styles.smallHeader, { marginTop: 15 }]}>PROFILE</Text>
 
