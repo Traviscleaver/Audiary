@@ -1,30 +1,19 @@
-import { useEffect, useRef } from "react";
-import {
-    Animated,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
-import { COLORS, Feather } from "../../../shared/imports";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Switch, Text, TouchableOpacity, View } from "react-native";
+import { COLORS } from "../../../shared/imports";
+import { Feather } from "@expo/vector-icons";
+import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 
-/**
- * ProfileSectionsOverlay
- *
- * Shows toggles to show/hide profile sections.
- *
- * Props:
- * - open: boolean
- * - onClose: () => void
- * - hidden: { album: boolean, song: boolean, artist: boolean }
- * - setHidden: (key: "album"|"song"|"artist", nextHidden: boolean) => void
- *
- * Note:
- * hidden=true means the section is hidden.
- * Switch=true means "show" (so it's inverted).
- */
-export default function ProfileSectionsOverlay({ open, onClose, hidden, setHidden }) {
+export default function ProfileSectionsOverlay({
+  open,
+  onClose,
+  blocks,
+  setBlocks,
+  onReorder,
+  onToggleDisplay,
+}) {
   const anim = useRef(new Animated.Value(0)).current;
+  const [local, setLocal] = useState([]);
 
   useEffect(() => {
     Animated.timing(anim, {
@@ -34,6 +23,13 @@ export default function ProfileSectionsOverlay({ open, onClose, hidden, setHidde
     }).start();
   }, [open, anim]);
 
+  useEffect(() => {
+    const sorted = (Array.isArray(blocks) ? blocks : [])
+      .slice()
+      .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+    setLocal(sorted);
+  }, [blocks, open]);
+
   if (!open) return null;
 
   const translateY = anim.interpolate({
@@ -41,31 +37,107 @@ export default function ProfileSectionsOverlay({ open, onClose, hidden, setHidde
     outputRange: [40, 0],
   });
 
-  const Row = ({ label, k }) => {
-    const isHidden = !!hidden?.[k];
-    const isShown = !isHidden;
+  const labelFor = (b) => {
+    if (b.block_type === "favorites") {
+      const s = String(b.subtype || "").toLowerCase();
+      if (s === "albums") return "Favourite Albums";
+      if (s === "tracks") return "Favourite Songs";
+      if (s === "artists") return "Favourite Artists";
+      return `Favourites: ${b.subtype || "Unknown"}`;
+    }
+    if (b.block_type === "stats") return `Stats: ${b.subtype || "Stats"}`;
+    if (b.block_type === "playlist") return "Playlist";
+    return b.block_type || "Block";
+  };
+
+  const persistOrder = async (nextList) => {
+    const order = nextList.map((b, idx) => ({
+      profile_block_id: b.profile_block_id,
+      rank: idx + 1,
+    }));
+
+    // optimistic local + parent
+    setLocal(nextList);
+    setBlocks?.(
+      nextList.map((b, idx) => ({
+        ...b,
+        rank: idx + 1,
+      }))
+    );
+
+    try {
+      await onReorder?.(order);
+    } catch (e) {
+      console.log("reorder failed", e?.message || e);
+    }
+  };
+
+  const toggleDisplay = async (item, nextShown) => {
+    const nextDisplay = !!nextShown;
+
+    setLocal((prev) =>
+      prev.map((b) =>
+        b.profile_block_id === item.profile_block_id
+          ? { ...b, display: nextDisplay }
+          : b
+      )
+    );
+
+    setBlocks?.((prev) =>
+      (prev || []).map((b) =>
+        b.profile_block_id === item.profile_block_id
+          ? { ...b, display: nextDisplay }
+          : b
+      )
+    );
+
+    try {
+      await onToggleDisplay?.(item.profile_block_id, nextDisplay);
+    } catch (e) {
+      console.log("toggle display failed", e?.message || e);
+    }
+  };
+
+  const renderItem = ({ item, drag, isActive }) => {
+    const shown = item.display !== false;
 
     return (
-      <View
-        style={{
-          paddingVertical: 12,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottomWidth: 1,
-          borderBottomColor: COLORS.divider,
-        }}
-      >
-        <Text style={{ color: COLORS.text, fontWeight: "800" }}>{label}</Text>
-
-        <Switch
-          value={isShown}
-          onValueChange={(nextShown) => {
-            // store as hidden
-            setHidden?.(k, !nextShown);
+      <ScaleDecorator>
+        <View
+          style={{
+            paddingVertical: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottomWidth: 1,
+            borderBottomColor: COLORS.divider,
+            opacity: isActive ? 0.85 : 1,
           }}
-        />
-      </View>
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+            <TouchableOpacity
+              onLongPress={drag}
+              delayLongPress={120}
+              activeOpacity={0.85}
+              style={{
+                paddingVertical: 6,
+                paddingHorizontal: 8,
+                borderRadius: 10,
+                backgroundColor: COLORS.divider,
+              }}
+            >
+              {/* hamburger */}
+              <Feather name="menu" size={16} color={COLORS.subtext} />
+            </TouchableOpacity>
+
+            <Text style={{ color: COLORS.text, fontWeight: "800", flexShrink: 1 }} numberOfLines={1}>
+              {labelFor(item)}
+            </Text>
+          </View>
+
+          <Switch value={shown} onValueChange={(v) => toggleDisplay(item, v)} />
+        </View>
+      </ScaleDecorator>
     );
   };
 
@@ -90,9 +162,9 @@ export default function ProfileSectionsOverlay({ open, onClose, hidden, setHidde
           borderTopLeftRadius: 18,
           borderTopRightRadius: 18,
           padding: 16,
+          maxHeight: "75%",
         }}
       >
-        {/* Header */}
         <View
           style={{
             flexDirection: "row",
@@ -111,13 +183,18 @@ export default function ProfileSectionsOverlay({ open, onClose, hidden, setHidde
         </View>
 
         <Text style={{ color: COLORS.subtext, marginBottom: 10 }}>
-          Choose which sections appear on your profile.
+          Drag the handle to reorder. Toggle to show/hide.
         </Text>
 
-        {/* Toggles */}
-        <Row label="Favourite Albums" k="album" />
-        <Row label="Favourite Songs" k="song" />
-        <Row label="Favourite Artists" k="artist" />
+        <DraggableFlatList
+          data={local}
+          keyExtractor={(item) => String(item.profile_block_id)}
+          renderItem={renderItem}
+          onDragEnd={async ({ data }) => {
+            await persistOrder(data);
+          }}
+          activationDistance={10}
+        />
 
         <View style={{ height: 8 }} />
       </Animated.View>

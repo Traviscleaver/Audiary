@@ -12,6 +12,7 @@ const ensureRoutes = require("./routes/ensure");
 const favouritesRoutes = require("./routes/favourites");
 const reviewRoutes = require("./routes/reviews");
 const spotifyRoutes = require("./routes/spotify");
+const profileBlocksRoutes = require("./routes/profileBlocks");
 
 const { pool } = require("./db");
 
@@ -31,6 +32,7 @@ app.use("/", albumRoutes);
 app.use("/", artistRoutes);
 app.use("/", ensureRoutes);
 app.use("/", favouritesRoutes);
+app.use("/", profileBlocksRoutes);
 app.use("/reviews", reviewRoutes);
 
 // ===== DB TEST ROUTE =====

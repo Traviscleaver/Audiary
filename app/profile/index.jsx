@@ -40,12 +40,22 @@ import FavouritesEditOverlay from "./components/overlays/FavouritesEditOverlay.j
 import FavouritesSearchOverlay from "./components/overlays/FavouritesSearchOverlay.jsx";
 import ProfileSectionsOverlay from "./components/overlays/ProfileSectionsOverlay.jsx";
 
-// api to remove favourite
-import { removeFavourite } from "../../lib/api.js";
+// api
+import {
+  removeFavourite,
+  getMyProfileBlocks,
+  createProfileBlock,
+  reorderProfileBlocks,
+  setProfileBlockDisplay
+} from "../../lib/api.js";
+
 
 const TABS = ["Home", "Reviews", "Lists"];
 
+// Keeping your old local hide for now (later you can switch to server display toggle)
 const HIDE_KEY = (userId) => `profile_hidden_fav_sections_v1_${userId}`;
+
+
 
 async function getPersisted(key) {
   if (Platform.OS === "web") return localStorage.getItem(key);
@@ -109,6 +119,7 @@ export default function Profile() {
   const [familyName, setFamilyName] = useState("");
 
   const [activeTab, setActiveTab] = useState("Home");
+  const [blocksReady, setBlocksReady] = useState(false);
 
   const {
     settingsOpen,
@@ -165,28 +176,6 @@ export default function Profile() {
     }
   }, [profile]);
 
-  // ✅ Categorize favourites (max 3 each)
-  const [favouriteAlbums, setFavouriteAlbums] = useState([]);
-  const [favouriteSongs, setFavouriteSongs] = useState([]);
-  const [favouriteArtists, setFavouriteArtists] = useState([]);
-
-  useEffect(() => {
-    setFavouriteAlbums(
-      favourites.filter((f) => f.item_type === "album").slice(0, 3)
-    );
-    setFavouriteSongs(
-      favourites.filter((f) => f.item_type === "song").slice(0, 3)
-    );
-    setFavouriteArtists(
-      favourites.filter((f) => f.item_type === "artist").slice(0, 3)
-    );
-  }, [favourites]);
-
-  const showFavLoading =
-    (loadingFavourites || loadingExtra) && favourites.length === 0;
-
-  const usernameTitle = isGuest ? "Guest" : handle || "User";
-
   // =========================================================
   // Sticky-then-hide Top Bar
   // =========================================================
@@ -199,8 +188,6 @@ export default function Profile() {
 
   const scrollY = useState(() => new Animated.Value(0))[0];
 
-  // stays visible for first STICKY_DELAY_PX,
-  // then slides out over HIDE_DISTANCE
   const topBarTranslateY = scrollY.interpolate({
     inputRange: [0, STICKY_DELAY_PX, STICKY_DELAY_PX + HIDE_DISTANCE],
     outputRange: [0, 0, -HIDE_DISTANCE],
@@ -224,10 +211,10 @@ export default function Profile() {
     setFavEditOpen(true);
   };
 
-  // ✅ NEW: Customize overlay state
+  // ✅ Customize overlay
   const [customizeOpen, setCustomizeOpen] = useState(false);
 
-  // ✅ Hide sections state (persisted)
+  // ✅ Hide sections state (persisted) — keeping for now
   const [hiddenFavSections, setHiddenFavSections] = useState({
     album: false,
     song: false,
@@ -248,10 +235,94 @@ export default function Profile() {
   const setHidden = async (key, nextHidden) => {
     const next = { ...hiddenFavSections, [key]: nextHidden };
     setHiddenFavSections(next);
-    if (userId) {
-      await setPersisted(HIDE_KEY(userId), JSON.stringify(next));
+    if (userId) await setPersisted(HIDE_KEY(userId), JSON.stringify(next));
+  };
+
+  // =========================================================
+  // ✅ Profile blocks (auto-create defaults if empty)
+  // =========================================================
+  const [profileBlocks, setProfileBlocks] = useState([]);
+  const [loadingBlocks, setLoadingBlocks] = useState(false);
+
+  const refreshBlocks = async () => {
+    if (isGuest) {
+      setProfileBlocks([]);
+      setBlocksReady(true);
+      return;
+    }
+
+    try {
+      setLoadingBlocks(true);
+      setBlocksReady(false);
+
+      const first = await getMyProfileBlocks();
+      const blocks1 = first?.blocks || [];
+
+      if (blocks1.length > 0) {
+        setProfileBlocks(blocks1);
+        return;
+      }
+
+      await createProfileBlock({ block_type: "favorites", subtype: "Albums" });
+      await createProfileBlock({ block_type: "favorites", subtype: "Tracks" });
+      await createProfileBlock({ block_type: "favorites", subtype: "Artists" });
+
+      const second = await getMyProfileBlocks();
+      setProfileBlocks(second?.blocks || []);
+    } catch {
+      setProfileBlocks([]);
+    } finally {
+      setLoadingBlocks(false);
+      setBlocksReady(true);
     }
   };
+
+  useEffect(() => {
+    refreshBlocks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest]);
+
+  // =========================================================
+  // ✅ Categorize favourites (rank-aware; respects item display)
+  // =========================================================
+  const [favouriteAlbums, setFavouriteAlbums] = useState([]);
+  const [favouriteSongs, setFavouriteSongs] = useState([]);
+  const [favouriteArtists, setFavouriteArtists] = useState([]);
+
+  useEffect(() => {
+    const byRank = (a, b) => {
+      const ra = a.rank ?? 999;
+      const rb = b.rank ?? 999;
+      if (ra !== rb) return ra - rb;
+      return 0;
+    };
+
+    setFavouriteAlbums(
+      favourites
+        .filter((f) => f.item_type === "album" && f.display !== false)
+        .sort(byRank)
+        .slice(0, 3)
+    );
+
+    setFavouriteSongs(
+      favourites
+        .filter((f) => f.item_type === "song" && f.display !== false)
+        .sort(byRank)
+        .slice(0, 3)
+    );
+
+    setFavouriteArtists(
+      favourites
+        .filter((f) => f.item_type === "artist" && f.display !== false)
+        .sort(byRank)
+        .slice(0, 3)
+    );
+  }, [favourites]);
+
+  const showFavLoading =
+    (loadingFavourites || loadingExtra) && favourites.length === 0;
+
+  const usernameTitle = isGuest ? "Guest" : handle || "User";
 
   const editItems =
     editingKey === "album"
@@ -285,12 +356,85 @@ export default function Profile() {
     }
   };
 
+  // =========================================================
+  // Render helpers
+  // =========================================================
+  const blocksOrdered = (profileBlocks || [])
+    .filter((b) => b.display !== false)
+    .slice()
+    .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+
+  const renderFavoritesBlock = (block) => {
+    const subtype = String(block.subtype || "").toLowerCase();
+
+    if (subtype === "albums") {
+      if (hiddenFavSections.album) return null;
+      return (
+        <ProfileSection
+          key={block.profile_block_id}
+          title="Favourite Albums"
+          onEditPress={() => openEditOverlay("Edit Favourite Albums", "album")}
+        >
+          {isGuest || showFavLoading ? (
+            <PlaceholderSlider type="album" count={3} />
+          ) : (
+            <FavouritesRow3
+              items={favouriteAlbums}
+              onPressAdd={() => openSearchOverlay("Add Favourite Album")}
+              onPressItem={() => {}}
+            />
+          )}
+        </ProfileSection>
+      );
+    }
+
+    if (subtype === "tracks") {
+      if (hiddenFavSections.song) return null;
+      return (
+        <ProfileSection
+          key={block.profile_block_id}
+          title="Favourite Songs"
+          onEditPress={() => openEditOverlay("Edit Favourite Songs", "song")}
+        >
+          {isGuest || showFavLoading ? (
+            <PlaceholderSlider type="song" count={3} />
+          ) : (
+            <FavouritesRow3
+              items={favouriteSongs}
+              onPressAdd={() => openSearchOverlay("Add Favourite Song")}
+              onPressItem={() => {}}
+            />
+          )}
+        </ProfileSection>
+      );
+    }
+
+    if (subtype === "artists") {
+      if (hiddenFavSections.artist) return null;
+      return (
+        <ProfileSection
+          key={block.profile_block_id}
+          title="Favourite Artists"
+          onEditPress={() => openEditOverlay("Edit Favourite Artists", "artist")}
+        >
+          {isGuest || showFavLoading ? (
+            <PlaceholderSlider type="artist" count={3} />
+          ) : (
+            <FavouritesRow3
+              items={favouriteArtists}
+              onPressAdd={() => openSearchOverlay("Add Favourite Artist")}
+              onPressItem={() => {}}
+            />
+          )}
+        </ProfileSection>
+      );
+    }
+
+    return null;
+  };
+
   return (
-    <AuthGate
-      mode="onEnter"
-      onCancel="back"
-      message="Log in to view your profile."
-    >
+    <AuthGate mode="onEnter" onCancel="back" message="Log in to view your profile.">
       <SafeAreaView style={styles.safe} edges={["left", "right", "bottom"]}>
         <View style={[styles.notchBg, { height: insetsTop }]} pointerEvents="none" />
 
@@ -319,8 +463,10 @@ export default function Profile() {
           )}
           refreshControl={
             <RefreshControl
-              refreshing={loadingFavourites}
-              onRefresh={refreshFavourites}
+              refreshing={loadingFavourites || loadingBlocks}
+              onRefresh={async () => {
+                await Promise.all([refreshFavourites?.(), refreshBlocks()]);
+              }}
               tintColor={COLORS.text}
             />
           }
@@ -338,7 +484,6 @@ export default function Profile() {
 
             <ProfileTabsBar tabs={TABS} activeTab={activeTab} setActiveTab={setActiveTab} />
 
-            {/* ✅ NEW: always-visible customize button */}
             {!isGuest && activeTab === "Home" && (
               <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
                 <TouchableOpacity
@@ -355,79 +500,33 @@ export default function Profile() {
 
             {activeTab === "Home" && (
               <>
-                {!hiddenFavSections.album && (
-                  <ProfileSection
-                    title="Favourite Albums"
-                    onEditPress={() => openEditOverlay("Edit Favourite Albums", "album")}
-                  >
-                    {isGuest || showFavLoading ? (
+                {/* If still empty after attempted default creation */}
+                {/* While loading blocks (initial), show placeholders instead of "empty" */}
+                {!isGuest && !blocksReady ? (
+                  <>
+                    <ProfileSection title="Favourite Albums">
                       <PlaceholderSlider type="album" count={3} />
-                    ) : (
-                      <FavouritesRow3
-                        items={favouriteAlbums}
-                        onPressAdd={() => openSearchOverlay("Add Favourite Album")}
-                        onPressItem={() => {}}
-                      />
-                    )}
-                  </ProfileSection>
-                )}
-
-                {!hiddenFavSections.song && (
-                  <ProfileSection
-                    title="Favourite Songs"
-                    onEditPress={() => openEditOverlay("Edit Favourite Songs", "song")}
-                  >
-                    {isGuest || showFavLoading ? (
+                    </ProfileSection>
+                    <ProfileSection title="Favourite Songs">
                       <PlaceholderSlider type="song" count={3} />
-                    ) : (
-                      <FavouritesRow3
-                        items={favouriteSongs}
-                        onPressAdd={() => openSearchOverlay("Add Favourite Song")}
-                        onPressItem={() => {}}
-                      />
-                    )}
-                  </ProfileSection>
-                )}
-
-                {!hiddenFavSections.artist && (
-                  <ProfileSection
-                    title="Favourite Artists"
-                    onEditPress={() => openEditOverlay("Edit Favourite Artists", "artist")}
-                  >
-                    {isGuest || showFavLoading ? (
+                    </ProfileSection>
+                    <ProfileSection title="Favourite Artists">
                       <PlaceholderSlider type="artist" count={3} />
-                    ) : (
-                      <FavouritesRow3
-                        items={favouriteArtists}
-                        onPressAdd={() => openSearchOverlay("Add Favourite Artist")}
-                        onPressItem={() => {}}
-                      />
-                    )}
-                  </ProfileSection>
+                    </ProfileSection>
+                  </>
+                ) : !isGuest && profileBlocks.length === 0 ? (
+                  <View style={styles.emptyWrap}>
+                    <Text style={styles.placeholderText}>Profile is empty.</Text>
+                  </View>
+                ) : (
+                  <>
+                    {blocksOrdered.map((b) => {
+                      if (b.block_type !== "favorites") return null;
+                      return renderFavoritesBlock(b);
+                    })}
+                    {/* Activity etc... */}
+                  </>
                 )}
-
-                <ProfileSection title="Recent Activity" bottomMargin>
-                  {isGuest ? (
-                    <View style={styles.emptyWrap}>
-                      <Text style={styles.placeholderText}>Log in to see activity.</Text>
-                    </View>
-                  ) : activity.length === 0 ? (
-                    <View style={styles.emptyWrap}>
-                      <Text style={styles.placeholderText}>No activity yet.</Text>
-                    </View>
-                  ) : (
-                    activity.map((a) => (
-                      <View key={a.activity_id} style={{ padding: 12 }}>
-                        <Text style={{ color: COLORS.text }}>
-                          {a.type} → {a.description}
-                        </Text>
-                        <Text style={{ color: COLORS.subtext, fontSize: 12 }}>
-                          {new Date(a.created_at).toLocaleString()}
-                        </Text>
-                      </View>
-                    ))
-                  )}
-                </ProfileSection>
               </>
             )}
           </Animated.View>
@@ -499,15 +598,34 @@ export default function Profile() {
             if (!editingKey) return;
             setHidden(editingKey, nextHidden);
           }}
+
+          // ✅ NEW: used by the draggable overlay to update UI instantly
+          onLocalReorder={(updatedItems) => {
+            // updatedItems = the 1–3 items for THIS bucket with new ranks
+            setFavourites((prev) => {
+              const map = new Map(
+                updatedItems.map((x) => [`${x.item_type}-${x.item_id}`, x.rank])
+              );
+              return prev.map((f) => {
+                const k = `${f.item_type}-${f.item_id}`;
+                if (!map.has(k)) return f;
+                return { ...f, rank: map.get(k) };
+              });
+            });
+          }}
         />
 
-        {/* ✅ NEW customize overlay */}
+
+
         <ProfileSectionsOverlay
           open={customizeOpen}
           onClose={() => setCustomizeOpen(false)}
-          hidden={hiddenFavSections}
-          setHidden={setHidden}
+          blocks={profileBlocks}
+          setBlocks={setProfileBlocks}
+          onReorder={reorderProfileBlocks}
+          onToggleDisplay={setProfileBlockDisplay}
         />
+
       </SafeAreaView>
     </AuthGate>
   );
