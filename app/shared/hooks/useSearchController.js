@@ -4,6 +4,8 @@
  * - manages search overlay open/close + query
  * - debounced fetch using the active tab plugin (tab.previewSearch)
  * - cache per tab + query so switching tabs feels instant
+ * - ✅ DOES NOT re-search if results already cached for the same (tab + query)
+ * - ✅ clears cache when search is exited (close) or query is cleared (<2 chars)
  */
 
 import {
@@ -18,12 +20,16 @@ import {
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const DEFAULT_DEBOUNCE_MS = 400;
 
+function makeCacheKey(tabKey, q) {
+  return `${tabKey}::${String(q || "").trim().toLowerCase()}`;
+}
+
 export default function useSearchController({ tab }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   const [loadingSearch, setLoadingSearch] = useState(false);
-  const [data, setData] = useState({}); // tab-specific shape (music: albums/tracks/artists, users, etc)
+  const [data, setData] = useState({}); // tab-specific shape
 
   const searchInputRef = useRef(null);
   const searchAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current;
@@ -31,28 +37,45 @@ export default function useSearchController({ tab }) {
   // cache key: `${tabKey}::${query}`
   const cacheRef = useRef(new Map());
 
+  // keep a handle to the latest request so we can cancel it
+  const abortRef = useRef(null);
+
+  const clearCache = () => {
+    cacheRef.current.clear();
+  };
+
   useEffect(() => {
-    // ✅ DO NOT REQUIRE searchOpen.
-    // If SearchHeader is just an input on the page (not a sliding overlay),
-    // your fetch was never running. This makes it run whenever query changes.
     if (!tab?.previewSearch) return;
 
     const q = query.trim();
+    const tabKey = tab?.key || "UnknownTab";
 
-    // Reset if query too short
+    // cancel any in-flight request when tab/query changes
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = null;
+
+    // Reset if query too short + clear session cache
     if (q.length < 2) {
       setData({});
+      setLoadingSearch(false);
+      clearCache();
+      return;
+    }
+
+    const cacheKey = makeCacheKey(tabKey, q);
+    const cached = cacheRef.current.get(cacheKey);
+
+    // ✅ If cached, DO NOT re-fetch. Just show it instantly.
+    if (cached) {
+      setData(cached);
       setLoadingSearch(false);
       return;
     }
 
-    const cacheKey = `${tab.key}::${q}`;
-    const cached = cacheRef.current.get(cacheKey);
-    if (cached) setData(cached);
-
     setLoadingSearch(true);
 
     const controller = new AbortController();
+    abortRef.current = controller;
 
     const timer = setTimeout(async () => {
       try {
@@ -60,13 +83,15 @@ export default function useSearchController({ tab }) {
           query: q,
           signal: controller.signal,
         });
+        if (controller.signal.aborted) return;
+
         cacheRef.current.set(cacheKey, res);
         setData(res);
       } catch (e) {
-        // ✅ DON'T SILENCE ERRORS - log them so you can see 404s, base path issues, etc.
+        if (e?.name === "AbortError") return;
         console.log("previewSearch error:", e);
       } finally {
-        setLoadingSearch(false);
+        if (!controller.signal.aborted) setLoadingSearch(false);
       }
     }, DEFAULT_DEBOUNCE_MS);
 
@@ -77,6 +102,9 @@ export default function useSearchController({ tab }) {
   }, [query, tab?.key]);
 
   const openSearchOverlay = () => {
+    // new search session
+    clearCache();
+
     setSearchOpen(true);
     setQuery("");
     setData({});
@@ -94,6 +122,11 @@ export default function useSearchController({ tab }) {
 
   const closeSearchOverlay = () => {
     searchInputRef.current?.blur();
+
+    // exit search session
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = null;
+    clearCache();
 
     Animated.timing(searchAnim, {
       toValue: SCREEN_WIDTH,

@@ -1,103 +1,65 @@
 // server/controllers/reviewController.js
 const { pool } = require("../db");
 
-// If you kept recalcUserStats in userController and exported it:
+// Optional stats recompute (kept from your existing controller)
 let recalcUserStats = null;
 try {
-  // userController in your project exports `_recalcUserStats` in the version we last generated.
-  // If you don’t have it, no problem — we fall back to local recompute below.
   // eslint-disable-next-line global-require
   recalcUserStats = require("./userController")._recalcUserStats;
 } catch (_) {
   recalcUserStats = null;
 }
 
-/**
- * Validate rating is either null/undefined/"" or a number within 0..5.
- * We allow one decimal place (DB is usually NUMERIC(2,1)).
- */
 function parseRating(input) {
   if (input === undefined || input === null) return null;
   if (typeof input === "string" && input.trim() === "") return null;
 
   const n = Number(input);
   if (!Number.isFinite(n)) throw new Error("Invalid rating");
-
-  // Clamp range
   if (n < 0 || n > 5) throw new Error("Rating must be between 0 and 5");
-
-  // Optional: enforce 0.5 steps (commented out)
-  // const doubled = Math.round(n * 2);
-  // if (Math.abs(n * 2 - doubled) > 1e-9) throw new Error("Rating must be in 0.5 increments");
-
-  // Keep 1 decimal to match NUMERIC(2,1)
   return Math.round(n * 10) / 10;
 }
 
 /**
- * Resolve target (song vs album) from request body.
- * Accepts any of:
- *  - { song_id } or { songId }
- *  - { album_id } or { albumId }
- *  - { targetType: "song"|"album", targetId }
+ * Your DB (screenshot) has ONLY song_id on reviews.
+ * So we accept { song_id | songId } and reject album_id for now.
  */
 function resolveTarget(body) {
   const songId = body.song_id ?? body.songId ?? null;
   const albumId = body.album_id ?? body.albumId ?? null;
 
-  const targetType = body.targetType ?? null;
-  const targetId = body.targetId ?? body.id ?? null;
-
-  let resolvedSongId = songId ? Number(songId) : null;
-  let resolvedAlbumId = albumId ? Number(albumId) : null;
-
-  if (!resolvedSongId && !resolvedAlbumId && targetType && targetId) {
-    if (targetType === "song") resolvedSongId = Number(targetId);
-    if (targetType === "album") resolvedAlbumId = Number(targetId);
+  if (albumId) {
+    throw new Error(
+      "This database schema only supports song reviews (album_id is not in reviews table)."
+    );
   }
 
-  if (resolvedSongId && !Number.isFinite(resolvedSongId)) resolvedSongId = null;
-  if (resolvedAlbumId && !Number.isFinite(resolvedAlbumId)) resolvedAlbumId = null;
-
-  // Exactly one must be provided
-  if (!!resolvedSongId === !!resolvedAlbumId) {
-    throw new Error("Provide exactly one of song_id or album_id");
+  const resolvedSongId = songId ? Number(songId) : null;
+  if (!resolvedSongId || !Number.isFinite(resolvedSongId)) {
+    throw new Error("Provide song_id");
   }
 
-  return {
-    target_type: resolvedSongId ? "song" : "album",
-    song_id: resolvedSongId,
-    album_id: resolvedAlbumId,
-  };
+  return { song_id: resolvedSongId };
 }
 
-/**
- * If you didn’t export recalcUserStats elsewhere, this local recompute keeps `stats`
- * consistent using reviews as the rating source.
- */
 async function localRecalcUserStats(userId) {
   await pool.query(
     `
     UPDATE stats SET
       total_reviews = (SELECT COUNT(*) FROM reviews WHERE user_id = $1),
-
-      -- ratings table removed; reviews.rating is the rating source
       total_ratings = (
         SELECT COUNT(*)
         FROM reviews
         WHERE user_id = $1 AND rating IS NOT NULL
       ),
-
       avg_rating = (
         SELECT COALESCE(AVG(rating), 0)
         FROM reviews
         WHERE user_id = $1 AND rating IS NOT NULL
       ),
-
       total_songs_listened = (
         SELECT COUNT(*) FROM diary_entries WHERE user_id = $1
       ),
-
       total_artists = (
         SELECT COUNT(DISTINCT ar.artist_id)
         FROM diary_entries d
@@ -106,7 +68,6 @@ async function localRecalcUserStats(userId) {
         JOIN artists ar ON ar.artist_id = al.artist_id
         WHERE d.user_id = $1
       ),
-
       last_updated = NOW()
     WHERE user_id = $1
     `,
@@ -120,8 +81,12 @@ async function recomputeStats(userId) {
 }
 
 /**
- * Hydrates a review row into a consistent shape the client can render.
- * Works for both song reviews and album reviews.
+ * One consistent hydrated review row:
+ * - review fields
+ * - user fields
+ * - song fields
+ * - album + artist fields via songs->albums->artists
+ * - likes_count (all time)
  */
 function buildReviewSelectSql() {
   return `
@@ -129,55 +94,91 @@ function buildReviewSelectSql() {
       r.review_id,
       r.user_id,
       r.song_id,
-      r.album_id,
       r.rating,
+      r.title, -- ✅ added
       r.content,
       r.created_at,
       r.updated_at,
 
-      -- target type for UI
-      CASE
-        WHEN r.song_id IS NOT NULL THEN 'song'
-        WHEN r.album_id IS NOT NULL THEN 'album'
-        ELSE 'unknown'
-      END AS target_type,
+      'song' AS target_type,
 
-      -- user display
       u.username,
       u.display_name,
       u.avatar_url,
 
-      -- song fields (only meaningful when song review)
       s.title AS song_title,
       s.spotify_id AS song_spotify_id,
 
-      -- album fields:
-      -- album review: r.album_id
-      -- song review: s.album_id
-      al.album_id AS resolved_album_id,
+      al.album_id AS album_id,
       al.title AS album_title,
       al.cover_url AS album_cover_url,
       al.spotify_id AS album_spotify_id,
 
-      -- album artist
       ar.name AS artist_name,
       ar.spotify_id AS artist_spotify_id,
 
-      -- likes
       (SELECT COUNT(*) FROM review_likes rl WHERE rl.review_id = r.review_id) AS likes_count
   `;
 }
 
 /**
+ * ✅ GET /reviews/top?limit=..&offset=..
+ * Top liked reviews from last 7 days.
+ *
+ * NOTE: Uses review_likes.liked_at (your likeReview inserts liked_at).
+ * If your column is named created_at instead, change rl.liked_at -> rl.created_at.
+ */
+exports.listTopReviewsWeekly = async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 20), 50);
+    const offset = Math.max(Number(req.query.offset || 0), 0);
+    const viewerId = req.user?.user_id ? Number(req.user.user_id) : -1;
+
+    const result = await pool.query(
+      `
+      WITH week_likes AS (
+        SELECT
+          rl.review_id,
+          COUNT(*)::int AS likes_week
+        FROM review_likes rl
+        WHERE rl.liked_at >= NOW() - INTERVAL '7 days'
+        GROUP BY rl.review_id
+      )
+      ${buildReviewSelectSql()},
+      COALESCE(wl.likes_week, 0) AS likes_week,
+      (SELECT EXISTS(
+        SELECT 1 FROM review_likes rl2
+        WHERE rl2.review_id = r.review_id AND rl2.user_id = $3
+      )) AS liked_by_me
+
+      FROM reviews r
+      JOIN users u ON u.user_id = r.user_id
+      LEFT JOIN songs s ON s.song_id = r.song_id
+      LEFT JOIN albums al ON al.album_id = s.album_id
+      LEFT JOIN artists ar ON ar.artist_id = al.artist_id
+      LEFT JOIN week_likes wl ON wl.review_id = r.review_id
+
+      ORDER BY COALESCE(wl.likes_week, 0) DESC, r.created_at DESC
+      LIMIT $1 OFFSET $2
+      `,
+      [limit, offset, viewerId]
+    );
+
+    return res.json({ reviews: result.rows });
+  } catch (err) {
+    console.error("listTopReviewsWeekly error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
  * GET /reviews/:reviewId
- * Public; if authOptional sets req.user, we also return liked_by_me.
  */
 exports.getReviewById = async (req, res) => {
   try {
     const reviewId = Number(req.params.reviewId);
-    if (!Number.isFinite(reviewId)) {
+    if (!Number.isFinite(reviewId))
       return res.status(400).json({ error: "Invalid review id" });
-    }
 
     const viewerId = req.user?.user_id ? Number(req.user.user_id) : -1;
 
@@ -188,13 +189,11 @@ exports.getReviewById = async (req, res) => {
         SELECT 1 FROM review_likes rl
         WHERE rl.review_id = r.review_id AND rl.user_id = $2
       )) AS liked_by_me
-
       FROM reviews r
       JOIN users u ON u.user_id = r.user_id
       LEFT JOIN songs s ON s.song_id = r.song_id
-      LEFT JOIN albums al ON al.album_id = COALESCE(r.album_id, s.album_id)
+      LEFT JOIN albums al ON al.album_id = s.album_id
       LEFT JOIN artists ar ON ar.artist_id = al.artist_id
-
       WHERE r.review_id = $1
       LIMIT 1
       `,
@@ -212,12 +211,13 @@ exports.getReviewById = async (req, res) => {
 };
 
 /**
- * GET /reviews/songs/:songId?limit=..&offset=..
+ * GET /reviews/songs/:songId
  */
 exports.listReviewsForSong = async (req, res) => {
   try {
     const songId = Number(req.params.songId);
-    if (!Number.isFinite(songId)) return res.status(400).json({ error: "Invalid song id" });
+    if (!Number.isFinite(songId))
+      return res.status(400).json({ error: "Invalid song id" });
 
     const limit = Math.min(Number(req.query.limit || 50), 100);
     const offset = Math.max(Number(req.query.offset || 0), 0);
@@ -230,13 +230,11 @@ exports.listReviewsForSong = async (req, res) => {
         SELECT 1 FROM review_likes rl
         WHERE rl.review_id = r.review_id AND rl.user_id = $4
       )) AS liked_by_me
-
       FROM reviews r
       JOIN users u ON u.user_id = r.user_id
       LEFT JOIN songs s ON s.song_id = r.song_id
-      LEFT JOIN albums al ON al.album_id = COALESCE(r.album_id, s.album_id)
+      LEFT JOIN albums al ON al.album_id = s.album_id
       LEFT JOIN artists ar ON ar.artist_id = al.artist_id
-
       WHERE r.song_id = $1
       ORDER BY r.created_at DESC
       LIMIT $2 OFFSET $3
@@ -252,99 +250,43 @@ exports.listReviewsForSong = async (req, res) => {
 };
 
 /**
- * GET /reviews/albums/:albumId?limit=..&offset=..
- */
-exports.listReviewsForAlbum = async (req, res) => {
-  try {
-    const albumId = Number(req.params.albumId);
-    if (!Number.isFinite(albumId)) return res.status(400).json({ error: "Invalid album id" });
-
-    const limit = Math.min(Number(req.query.limit || 50), 100);
-    const offset = Math.max(Number(req.query.offset || 0), 0);
-    const viewerId = req.user?.user_id ? Number(req.user.user_id) : -1;
-
-    const result = await pool.query(
-      `
-      ${buildReviewSelectSql()},
-      (SELECT EXISTS(
-        SELECT 1 FROM review_likes rl
-        WHERE rl.review_id = r.review_id AND rl.user_id = $4
-      )) AS liked_by_me
-
-      FROM reviews r
-      JOIN users u ON u.user_id = r.user_id
-      LEFT JOIN songs s ON s.song_id = r.song_id
-      LEFT JOIN albums al ON al.album_id = COALESCE(r.album_id, s.album_id)
-      LEFT JOIN artists ar ON ar.artist_id = al.artist_id
-
-      -- album reviews only (album target)
-      WHERE r.album_id = $1
-      ORDER BY r.created_at DESC
-      LIMIT $2 OFFSET $3
-      `,
-      [albumId, limit, offset, viewerId]
-    );
-
-    return res.json({ reviews: result.rows });
-  } catch (err) {
-    console.error("listReviewsForAlbum error:", err);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-};
-
-/**
  * POST /reviews
- *
- * Upserts a review for the logged-in user and the target.
- * This keeps client simple: "submit" can always call POST.
- *
- * Body accepts:
- *  - song_id OR album_id (recommended)
- *  - rating (0..5, nullable)
- *  - content (string, can be empty)
- *
- * Returns { review_id, created, review }
+ * Upsert by (user_id, song_id)
  */
 exports.upsertReview = async (req, res) => {
   const client = await pool.connect();
   try {
     const userId = Number(req.user.user_id);
 
-    const { song_id, album_id } = resolveTarget(req.body);
+    const { song_id } = resolveTarget(req.body);
     const rating = parseRating(req.body.rating);
-    const content = typeof req.body.content === "string" ? req.body.content : null;
+
+    const title =
+      typeof req.body.title === "string" ? req.body.title.trim() : null; // ✅ added
+    const content =
+      typeof req.body.content === "string" ? req.body.content : null;
 
     await client.query("BEGIN");
 
-    // Ensure target exists (fail fast with 400 if missing)
-    if (song_id) {
-      const chk = await client.query(`SELECT song_id FROM songs WHERE song_id = $1 LIMIT 1`, [song_id]);
-      if (!chk.rows[0]) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({ error: "Song not found" });
-      }
-    } else if (album_id) {
-      const chk = await client.query(`SELECT album_id FROM albums WHERE album_id = $1 LIMIT 1`, [album_id]);
-      if (!chk.rows[0]) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({ error: "Album not found" });
-      }
+    // Ensure song exists
+    const chk = await client.query(
+      `SELECT song_id FROM songs WHERE song_id = $1 LIMIT 1`,
+      [song_id]
+    );
+    if (!chk.rows[0]) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Song not found" });
     }
 
-    // Find an existing review by this user for this exact target.
+    // Existing?
     const existing = await client.query(
       `
       SELECT review_id
       FROM reviews
-      WHERE user_id = $1
-        AND (
-          ($2::int IS NOT NULL AND song_id = $2::int)
-          OR
-          ($3::int IS NOT NULL AND album_id = $3::int)
-        )
+      WHERE user_id = $1 AND song_id = $2
       LIMIT 1
       `,
-      [userId, song_id, album_id]
+      [userId, song_id]
     );
 
     let reviewId;
@@ -356,50 +298,39 @@ exports.upsertReview = async (req, res) => {
       await client.query(
         `
         UPDATE reviews
-        SET
-          rating = $1,
-          content = $2,
-          updated_at = NOW()
-        WHERE review_id = $3 AND user_id = $4
+        SET rating = $1, title = $2, content = $3, updated_at = NOW()
+        WHERE review_id = $4 AND user_id = $5
         `,
-        [rating, content, reviewId, userId]
+        [rating, title, content, reviewId, userId]
       );
     } else {
       created = true;
 
       const ins = await client.query(
         `
-        INSERT INTO reviews (user_id, song_id, album_id, rating, content, created_at, updated_at)
+        INSERT INTO reviews (user_id, song_id, rating, title, content, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
         RETURNING review_id
         `,
-        [userId, song_id, album_id, rating, content]
+        [userId, song_id, rating, title, content]
       );
 
       reviewId = ins.rows[0].review_id;
 
-      // Add activity (optional but useful for feeds)
+      // Optional activity
       await client.query(
         `
         INSERT INTO activities (user_id, type, target_id, description, created_at)
         VALUES ($1, 'review', $2, $3, NOW())
         `,
-        [
-          userId,
-          reviewId,
-          song_id
-            ? `Reviewed a song`
-            : `Reviewed an album`,
-        ]
+        [userId, reviewId, "Reviewed a song"]
       );
     }
 
     await client.query("COMMIT");
 
-    // Keep stats consistent (uses reviews as the rating source)
     await recomputeStats(userId);
 
-    // Return hydrated review
     const hydrated = await pool.query(
       `
       ${buildReviewSelectSql()},
@@ -407,7 +338,7 @@ exports.upsertReview = async (req, res) => {
       FROM reviews r
       JOIN users u ON u.user_id = r.user_id
       LEFT JOIN songs s ON s.song_id = r.song_id
-      LEFT JOIN albums al ON al.album_id = COALESCE(r.album_id, s.album_id)
+      LEFT JOIN albums al ON al.album_id = s.album_id
       LEFT JOIN artists ar ON ar.artist_id = al.artist_id
       WHERE r.review_id = $1
       LIMIT 1
@@ -426,17 +357,15 @@ exports.upsertReview = async (req, res) => {
     } catch (_) {}
 
     console.error("upsertReview error:", err);
-
-    // Surface friendly validation errors
     const msg = String(err?.message || "");
     if (
-      msg.includes("Provide exactly one") ||
+      msg.includes("Provide song_id") ||
       msg.includes("Rating must be between") ||
-      msg.includes("Invalid rating")
+      msg.includes("Invalid rating") ||
+      msg.includes("schema only supports song reviews")
     ) {
       return res.status(400).json({ error: msg });
     }
-
     return res.status(500).json({ error: "Internal server error" });
   } finally {
     client.release();
@@ -445,35 +374,34 @@ exports.upsertReview = async (req, res) => {
 
 /**
  * PUT /reviews/:reviewId
- * Owner-only update (rating/content).
- * If you don’t need PUT because POST upserts, you can keep it anyway for clarity.
  */
 exports.updateReview = async (req, res) => {
   try {
     const userId = Number(req.user.user_id);
     const reviewId = Number(req.params.reviewId);
-    if (!Number.isFinite(reviewId)) return res.status(400).json({ error: "Invalid review id" });
+    if (!Number.isFinite(reviewId))
+      return res.status(400).json({ error: "Invalid review id" });
 
     const rating = parseRating(req.body.rating);
-    const content = typeof req.body.content === "string" ? req.body.content : null;
+    const title =
+      typeof req.body.title === "string" ? req.body.title.trim() : null; // ✅ added
+    const content =
+      typeof req.body.content === "string" ? req.body.content : null;
 
     const updated = await pool.query(
       `
       UPDATE reviews
-      SET
-        rating = $1,
-        content = $2,
-        updated_at = NOW()
-      WHERE review_id = $3 AND user_id = $4
+      SET rating = $1, title = $2, content = $3, updated_at = NOW()
+      WHERE review_id = $4 AND user_id = $5
       RETURNING review_id
       `,
-      [rating, content, reviewId, userId]
+      [rating, title, content, reviewId, userId]
     );
 
-    if (!updated.rows[0]) return res.status(404).json({ error: "Review not found" });
+    if (!updated.rows[0])
+      return res.status(404).json({ error: "Review not found" });
 
     await recomputeStats(userId);
-
     return res.json({ ok: true, review_id: reviewId });
   } catch (err) {
     console.error("updateReview error:", err);
@@ -487,13 +415,13 @@ exports.updateReview = async (req, res) => {
 
 /**
  * DELETE /reviews/:reviewId
- * Owner-only.
  */
 exports.deleteReview = async (req, res) => {
   try {
     const userId = Number(req.user.user_id);
     const reviewId = Number(req.params.reviewId);
-    if (!Number.isFinite(reviewId)) return res.status(400).json({ error: "Invalid review id" });
+    if (!Number.isFinite(reviewId))
+      return res.status(400).json({ error: "Invalid review id" });
 
     const del = await pool.query(
       `
@@ -504,10 +432,10 @@ exports.deleteReview = async (req, res) => {
       [reviewId, userId]
     );
 
-    if (!del.rows[0]) return res.status(404).json({ error: "Review not found" });
+    if (!del.rows[0])
+      return res.status(404).json({ error: "Review not found" });
 
     await recomputeStats(userId);
-
     return res.json({ ok: true });
   } catch (err) {
     console.error("deleteReview error:", err);
@@ -522,7 +450,8 @@ exports.likeReview = async (req, res) => {
   try {
     const userId = Number(req.user.user_id);
     const reviewId = Number(req.params.reviewId);
-    if (!Number.isFinite(reviewId)) return res.status(400).json({ error: "Invalid review id" });
+    if (!Number.isFinite(reviewId))
+      return res.status(400).json({ error: "Invalid review id" });
 
     await pool.query(
       `
@@ -547,7 +476,8 @@ exports.unlikeReview = async (req, res) => {
   try {
     const userId = Number(req.user.user_id);
     const reviewId = Number(req.params.reviewId);
-    if (!Number.isFinite(reviewId)) return res.status(400).json({ error: "Invalid review id" });
+    if (!Number.isFinite(reviewId))
+      return res.status(400).json({ error: "Invalid review id" });
 
     await pool.query(
       `

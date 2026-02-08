@@ -1,14 +1,17 @@
-// app/shared/components/FooterBar.jsx (or wherever yours lives)
+// app/shared/components/FooterBar.jsx
 import { usePathname } from "expo-router";
+import React from "react";
 import { COLORS, Feather, TouchableOpacity, View } from "../imports";
+import { useReviewOverlay } from "./review/ReviewOverlayProvider"; // ✅ overlay hook
 
 export default function FooterBar({ router, insets }) {
   const pathname = usePathname();
+  const { openReview } = useReviewOverlay(); // ✅ MUST be inside provider
 
   const TABS = [
     { route: "/home", icon: "home" },
     { route: "/search", icon: "search" },
-    { route: "/review", icon: "plus", isCenter: true },
+    { route: "__review_overlay__", icon: "plus", isCenter: true }, // ✅ not a real route anymore
     { route: "/activity", icon: "message-circle" },
     { route: "/profile", icon: "user" },
   ];
@@ -17,8 +20,8 @@ export default function FooterBar({ router, insets }) {
   const SLOT_HEIGHT = 80;
 
   const onUniversalRatePress = () => {
-    // ✅ Combined search handles song + album
-    router.push({ pathname: "/review" });
+    // ✅ open overlay, blank => will prompt search inside overlay
+    openReview();
   };
 
   return (
@@ -50,7 +53,7 @@ export default function FooterBar({ router, insets }) {
           const isActive =
             tab.route === "/"
               ? pathname === "/"
-              : pathname.startsWith(tab.route);
+              : tab.route !== "__review_overlay__" && pathname.startsWith(tab.route);
 
           // ✅ Center "+" button
           if (tab.isCenter) {

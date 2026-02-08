@@ -1,4 +1,4 @@
-import { ALBUMS_TAB } from "../libs/constants";
+import { ALBUMS_TAB } from "../../../lib/constants";
 
 export function getPopularSectionState({
   tab,

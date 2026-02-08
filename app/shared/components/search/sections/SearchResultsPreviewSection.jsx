@@ -12,16 +12,14 @@ export default function SearchResultsPreviewSection({
 }) {
   if (!Array.isArray(data) || data.length === 0) return null;
 
-  // ✅ USERS PREVIEW (NEW)
+  // ✅ USERS PREVIEW
   if (type === "Users") {
     return (
       <View style={{ marginBottom: 28 }}>
-
-
         <FlatList
           data={data}
           scrollEnabled={false}
-          keyExtractor={(u) => String(u.user_id || u.username)}
+          keyExtractor={(u, idx) => String(u.user_id || u.username || idx)}
           renderItem={({ item }) => (
             <TouchableOpacity
               activeOpacity={0.85}
@@ -63,7 +61,7 @@ export default function SearchResultsPreviewSection({
         />
 
         <TouchableOpacity
-          onPress={() => onViewAll("Users")}
+          onPress={() => onViewAll?.("Users")}
           activeOpacity={0.8}
           style={{ marginTop: 10 }}
         >
@@ -75,7 +73,7 @@ export default function SearchResultsPreviewSection({
     );
   }
 
-  // ✅ EXISTING BEHAVIOR (Albums/Tracks/Artists)
+  // ✅ Albums/Tracks/Artists
   return (
     <View style={{ marginBottom: 28 }}>
       <Text
@@ -91,19 +89,19 @@ export default function SearchResultsPreviewSection({
 
       <FlatList
         data={data}
-        keyExtractor={(i) => String(i.id)}
+        keyExtractor={(i, idx) => String(i?.id ?? i?.spotifyId ?? idx)}
         scrollEnabled={false}
         renderItem={({ item }) => (
           <SearchResultRow
             item={item}
-            isArtist={type === "Artists"}
+            variant={type === "Artists" ? "artist" : "default"} // ✅ FIX
             onPress={() => onOpen(item, type)}
           />
         )}
       />
 
       <TouchableOpacity
-        onPress={() => onViewAll(type)}
+        onPress={() => onViewAll?.(type)}
         activeOpacity={0.8}
         style={{ marginTop: 10 }}
       >

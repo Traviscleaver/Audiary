@@ -1,3 +1,4 @@
+// app/shared/components/search/overlays/SearchResultsOverlay.jsx
 import {
   ActivityIndicator,
   Animated,
@@ -6,6 +7,7 @@ import {
   SIZES,
   Text,
   View,
+  useSafeAreaInsets,
 } from "../../../imports";
 
 import SearchResultRow from "../rows/SearchResultRow";
@@ -22,14 +24,24 @@ export default function SearchResultsOverlay({
   openDetail,
   insetsBottom = 0,
 }) {
+  const insets = useSafeAreaInsets();
+
   if (!overlayType) return null;
 
-  const title =
-    overlayQuery && overlayQuery.trim().length > 0
-      ? `"${overlayQuery}" in ${overlayType}`
-      : overlayType;
+  // ✅ Header title should be Albums / Tracks / Artists
+  const headerTitle =
+    overlayType === "Tracks"
+      ? "Tracks"
+      : overlayType === "Albums"
+      ? "Albums"
+      : overlayType === "Artists"
+      ? "Artists"
+      : String(overlayType);
 
   const isArtist = overlayType === "Artists";
+
+  // ✅ Space so list doesn't go under header
+  const topPad = insets.top + SIZES.navHeight + 10;
 
   return (
     <Animated.View
@@ -42,33 +54,46 @@ export default function SearchResultsOverlay({
         },
       ]}
     >
-      <DetailHeader title={title} onBack={closeOverlay} />
+      {/* ✅ BLACK NAVBAR BACKGROUND */}
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: insets.top + SIZES.navHeight,
+          backgroundColor: "#000",
+          zIndex: 9998,
+        }}
+      />
+
+      {/* back button + centered title */}
+      <DetailHeader title={headerTitle} onBack={closeOverlay} />
 
       {overlayLoading ? (
-        <View style={styles.center}>
+        <View style={[styles.center, { paddingTop: topPad }]}>
           <ActivityIndicator size="large" color={COLORS.text} />
         </View>
       ) : (
         <FlatList
           data={overlayData || []}
-          keyExtractor={(i) => String(i.id)}
+          keyExtractor={(i, idx) => String(i?.id ?? i?.spotifyId ?? idx)}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            padding: 16,
+            paddingHorizontal: 16,
+            paddingTop: topPad,
             paddingBottom: SIZES.footerHeight + insetsBottom + 24,
           }}
           renderItem={({ item }) => (
             <SearchResultRow
               item={item}
-              isArtist={isArtist}
+              variant={isArtist ? "artist" : "default"}
               onPress={() => openDetail(item, overlayType)}
             />
           )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Text style={{ color: COLORS.subtext }}>
-                No results found.
-              </Text>
+              <Text style={{ color: COLORS.subtext }}>No results found.</Text>
             </View>
           }
         />

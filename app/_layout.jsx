@@ -2,11 +2,14 @@
 import { Stack } from "expo-router";
 import React from "react";
 import { AuthProvider, useAuth } from "../lib/AuthContext";
+import { ReviewOverlayProvider } from "./shared/components/review/ReviewOverlayProvider";
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootStack />
+      <ReviewOverlayProvider>
+        <RootStack />
+      </ReviewOverlayProvider>
     </AuthProvider>
   );
 }
