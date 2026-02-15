@@ -16,7 +16,11 @@ function parseRating(input) {
 
   const n = Number(input);
   if (!Number.isFinite(n)) throw new Error("Invalid rating");
-  if (n < 0 || n > 5) throw new Error("Rating must be between 0 and 5");
+
+  // ✅ UPDATED: allow 0–10 instead of 0–5
+  if (n < 0 || n > 10) throw new Error("Rating must be between 0 and 10");
+
+  // ✅ keep 0.1 increments
   return Math.round(n * 10) / 10;
 }
 

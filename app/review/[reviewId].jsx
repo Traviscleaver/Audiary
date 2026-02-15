@@ -1,7 +1,9 @@
 // app/review/[reviewId].jsx
-import { FontAwesome } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+
+import CommentRow from "../shared/components/review/reviewCard/CommentRow";
+import StaticStarRating from "../shared/components/review/StaticStarRating";
 
 import {
     ActivityIndicator,
@@ -17,89 +19,6 @@ import {
 
 import { getReviewById } from "../../lib/api";
 import { styles as homeStyles } from "../home/styles/styles";
-
-// ---- static half-star (no MaskedView) ----
-function normalizeStars(v) {
-  const n = Number(v || 0);
-  if (!Number.isFinite(n)) return 0;
-  const clamped = Math.max(0, Math.min(5, n));
-  return Math.round(clamped * 2) / 2;
-}
-
-function StarsRow({ rating = 0, size = 18, showNumber = false }) {
-  const normalized = useMemo(() => normalizeStars(rating), [rating]);
-
-  const stars = useMemo(() => {
-    const arr = [];
-    for (let i = 1; i <= 5; i++) {
-      if (normalized >= i) arr.push(1);
-      else if (normalized >= i - 0.5) arr.push(0.5);
-      else arr.push(0);
-    }
-    return arr;
-  }, [normalized]);
-
-  const active = COLORS.active || "#22c55e";
-  const outline = COLORS.subtext || "rgba(255,255,255,0.55)";
-
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-      {stars.map((fill, idx) => (
-        <View key={`star-${idx}`} style={{ width: size, height: size, marginRight: 4 }}>
-          <FontAwesome
-            name="star-o"
-            size={size}
-            color={outline}
-            style={{ position: "absolute", left: 0, top: 0 }}
-          />
-          {fill > 0 && (
-            <View
-              pointerEvents="none"
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                height: size,
-                width: size * fill,
-                overflow: "hidden",
-              }}
-            >
-              <FontAwesome
-                name="star"
-                size={size}
-                color={active}
-                style={{ position: "absolute", left: 0, top: 0 }}
-              />
-            </View>
-          )}
-        </View>
-      ))}
-      {showNumber ? (
-        <Text style={{ marginLeft: 8, color: COLORS.subtext, fontWeight: "800" }}>
-          {normalized.toFixed(1)}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function CommentRow({ c }) {
-  return (
-    <View style={ui.commentRow}>
-      <View style={ui.avatar}>
-        <Text style={ui.avatarText}>{(c.username?.[0] || "U").toUpperCase()}</Text>
-      </View>
-
-      <View style={{ flex: 1 }}>
-        <View style={ui.commentTopLine}>
-          <Text style={ui.commentUser}>{c.username}</Text>
-          <Text style={ui.commentTime}>{c.timeLabel}</Text>
-        </View>
-        <Text style={ui.commentBody}>{c.body}</Text>
-      </View>
-    </View>
-  );
-}
 
 export default function ReviewScreen() {
   const params = useLocalSearchParams();
@@ -151,7 +70,7 @@ export default function ReviewScreen() {
   const username = review?.display_name || review?.username || "User";
   const coverUrl = review?.album_cover_url;
 
-  // ✅ NEW: review title from DB
+  // review title from DB
   const reviewTitle = String(review?.review_title ?? review?.title ?? "").trim();
   const hasReviewTitle = reviewTitle.length > 0;
 
@@ -192,7 +111,11 @@ export default function ReviewScreen() {
           <View style={ui.headerRow}>
             <View style={ui.coverWrap}>
               {coverUrl ? (
-                <Image source={{ uri: coverUrl }} style={ui.cover} />
+                <Image
+                  source={{ uri: coverUrl }}
+                  style={ui.cover}
+                  resizeMode="contain" // ✅ never crop/warp
+                />
               ) : (
                 <View style={ui.coverFallback}>
                   <Text style={ui.coverFallbackText}>No cover</Text>
@@ -214,7 +137,7 @@ export default function ReviewScreen() {
               <View style={{ height: 10 }} />
 
               <View style={ui.metaLine}>
-                <StarsRow rating={review.rating} size={18} showNumber={false} />
+                <StaticStarRating value={review.rating} size={18} showNumber={false} />
                 <View style={{ width: 10 }} />
                 <Text style={ui.metaText}>by</Text>
                 <Text style={ui.metaUser}> {username}</Text>
@@ -222,7 +145,7 @@ export default function ReviewScreen() {
             </View>
           </View>
 
-          {/* ✅ Review Title */}
+          {/* Review Title */}
           {hasReviewTitle ? (
             <Text style={ui.reviewTitle} numberOfLines={3}>
               {reviewTitle}
@@ -251,7 +174,7 @@ export default function ReviewScreen() {
             {comments.length === 0 ? (
               <Text style={ui.commentsEmpty}>No comments yet.</Text>
             ) : (
-              comments.map((c) => <CommentRow key={c.id} c={c} />)
+              comments.map((c) => <CommentRow key={c.id} c={c} styles={ui} />)
             )}
           </View>
         </ScrollView>
@@ -297,6 +220,7 @@ const ui = {
     backgroundColor: COLORS.card || "rgba(255,255,255,0.06)",
   },
   cover: { width: "100%", height: "100%" },
+
   coverFallback: {
     width: "100%",
     height: "100%",
@@ -313,7 +237,6 @@ const ui = {
   metaText: { color: COLORS.subtext, fontWeight: "700" },
   metaUser: { color: COLORS.text, fontWeight: "900" },
 
-  // ✅ Review Title
   reviewTitle: {
     marginTop: 14,
     color: COLORS.text,
@@ -348,13 +271,14 @@ const ui = {
   commentsCount: { color: COLORS.subtext, fontWeight: "800" },
   commentsEmpty: { color: COLORS.subtext, fontWeight: "700" },
 
+  // styles consumed by shared CommentRow component:
   commentRow: {
     flexDirection: "row",
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
-  avatar: {
+  commentAvatar: {
     width: 34,
     height: 34,
     borderRadius: 999,
@@ -363,7 +287,7 @@ const ui = {
     justifyContent: "center",
     marginRight: 12,
   },
-  avatarText: { color: "rgba(255,255,255,0.9)", fontWeight: "900" },
+  commentAvatarText: { color: "rgba(255,255,255,0.9)", fontWeight: "900" },
 
   commentTopLine: {
     flexDirection: "row",

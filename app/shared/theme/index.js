@@ -19,6 +19,9 @@ export const COLORS = {
   danger: "#ff5757",
   buttonOff: "#7e7e7e22",
   buttonOn: "#8f8f8fff",
+  rateGood: "#22c55e",
+  rateBad: "#ff6b6b",
+  rateMedium: "#facc15",
 };
 
 export const SIZES = {

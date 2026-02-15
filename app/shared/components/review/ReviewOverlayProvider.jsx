@@ -1,4 +1,3 @@
-// app/shared/components/review/ReviewOverlayProvider.jsx
 import React, { createContext, useContext, useMemo, useRef, useState } from "react";
 import { Alert, Animated, Easing, Modal, Pressable, View } from "react-native";
 import ReviewOverlaySheet from "./ReviewOverlaySheet";
@@ -106,6 +105,7 @@ export function ReviewOverlayProvider({ children }) {
               <View style={styles.handle} />
             </View>
 
+            {/* ✅ Sheet owns footer now */}
             <ReviewOverlaySheet
               params={params}
               onRequestClose={closeReview}

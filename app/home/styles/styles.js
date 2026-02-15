@@ -2,331 +2,308 @@
 import { COLORS, StyleSheet } from "../../shared/imports";
 
 export const styles = StyleSheet.create({
-  /* =========================
-     BASE / LAYOUT
-  ========================= */
   container: { flex: 1, backgroundColor: COLORS.screen },
   scroll: { flex: 1 },
 
-  centerLoader: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  notchBg: {
-    width: "100%",
-    position: "absolute",
-    top: 0,
-    left: 0,
-    zIndex: 9999,
+  /* blank navbar container */
+  navBlank: {
     backgroundColor: COLORS.screen,
-  },
-
-  /* =========================
-     HEADER (if you use it)
-  ========================= */
-  header: {
-    backgroundColor: COLORS.screen,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
   },
 
-  appTitle: {
+  /* section title */
+  sectionTitle: {
     color: COLORS.text,
-    fontSize: 30,
-    fontWeight: "900",
-    textAlign: "center",
-    marginBottom: 6,
+    fontWeight: "950",
+    fontSize: 18,
+    marginBottom: 10,
   },
 
   /* =========================
-     SECTION / TABS
+     TRENDING
   ========================= */
-  sectionHeaderRow: {
-    marginTop: 7,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  sectionTitle: {
-    color: COLORS.text,
-    fontSize: 23,
-    fontWeight: "700",
-  },
-
-  sectionTabsRow: { flexDirection: "row", alignItems: "center" },
-  sectionTabLabel: { color: COLORS.subtext, fontSize: 14, fontWeight: "600" },
-  sectionTabLabelActive: { color: COLORS.active },
-  sectionTabSlash: { color: COLORS.subtext, marginHorizontal: 4, fontSize: 12 },
-
-  homeSectionTitle: {
-    color: COLORS.text,
-    fontSize: 22,
-    fontWeight: "700",
+  trendingTabsBar: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
+    paddingBottom: 6,
     marginBottom: 12,
   },
 
-  loaderWrap: { paddingVertical: 24 },
-  emptyText: { color: COLORS.subtext, padding: 24, textAlign: "center" },
-
-  /* =========================
-     GRID BUTTONS (legacy / optional)
-  ========================= */
-  gridBtnStyle: {
-    flex: 1,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+  trendingLoaderRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    // NOTE: you had this hard-coded; keep if intentional
-    backgroundColor: "#ffadadff",
+    gap: 10,
+    paddingVertical: 10,
   },
 
-  gridBtnTextStyle: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "800",
+  trendingRow: {
+    paddingRight: 8,
+    paddingBottom: 10,
   },
 
-  /* =========================
-     POPULAR GRID
-  ========================= */
-  popularGridContent: {
-    paddingHorizontal: 14,
-    paddingTop: 6,
-    paddingBottom: 6,
-  },
-
-  popularGridRow: {
-    justifyContent: "space-between",
-  },
-
-  popularGridItem: {
-    width: "32%",
-    marginBottom: 14,
-  },
-
-  popularGridCoverWrap: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-
-  popularGridImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 12,
-  },
-
-  popularGridTitle: {
-    marginTop: 6,
-    color: COLORS.text,
-    fontSize: 12,
-  },
-
-  popularGridArtist: {
-    marginTop: 2,
-    color: COLORS.subtext,
-    fontSize: 11,
-  },
-
-  /* =========================
-     CAROUSEL (albums)
-  ========================= */
-  carouselContent: { paddingHorizontal: 16, paddingTop: 12 },
-
-  albumCard: { width: 130, marginRight: 14, alignItems: "center" },
-
-  albumCoverWrap: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: "#1f1f1f",
-    position: "relative",
-  },
-
-  albumImage: { width: "100%", height: "100%" },
-
-  albumPlaceholder: { flex: 1, justifyContent: "center", alignItems: "center" },
-  albumPlaceholderText: { color: COLORS.subtext, fontSize: 14 },
-
-  albumTitle: {
-    color: COLORS.text,
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 6,
-    textAlign: "center",
-  },
-
-  albumArtist: {
-    color: COLORS.subtext,
-    fontSize: 11,
-    marginTop: 2,
-    textAlign: "center",
-  },
-
-  rankBubble: {
-    position: "absolute",
-    top: 6,
-    left: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderWidth: 1,
-    borderColor: COLORS.active,
-  },
-
-  rankText: { fontSize: 10, fontWeight: "700" },
-
-  /* =========================
-     TOP REVIEWS THIS WEEK
-     (used by app/home/index.jsx ReviewCard)
-  ========================= */
-
-  // Card wrapper (touchable)
-  topReviewCard: {
-  paddingTop: 14,
-  paddingBottom: 18,
-  borderBottomWidth: 2,
-  borderBottomColor: COLORS.divider,
-  },
-
-
-  // Title above text
-  topReviewTitle: {
-    color: COLORS.text,
-    fontWeight: "900",
-    fontSize: 18,
-    lineHeight: 22,
-  },
-
-  // Body text
-  topReviewBody: {
-    marginTop: 8,
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "600",
-  },
-
-  // Media row
-  topReviewMediaRow: { flexDirection: "row", alignItems: "center" },
-
-  topReviewCoverWrap: {
-    width: 72,
-    height: 72,
+  trendingItem: {
+    width: 74,
+    height: 74,
     borderRadius: 16,
     overflow: "hidden",
+    marginRight: 10,
     backgroundColor: COLORS.card || "rgba(255,255,255,0.06)",
   },
 
-  topReviewCover: { width: "100%", height: "100%" },
+  trendingCover: { width: "100%", height: "100%" },
 
-  topReviewCoverFallback: {
-    width: "100%",
-    height: "100%",
+  trendingCoverFallback: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.08)",
   },
 
-  topReviewCoverFallbackText: {
-    color: "rgba(255,255,255,0.75)",
-    fontWeight: "800",
-    fontSize: 11,
+  trendingCoverFallbackText: { color: "rgba(255,255,255,0.75)", fontWeight: "900" },
+
+  /* =========================
+     FEED CONTROLS (moved here)
+  ========================= */
+  feedControlsBar: {
+    marginTop: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
   },
 
-  topReviewMediaRight: { flex: 1, marginLeft: 12 },
-
-  topReviewItemTitle: { color: COLORS.text, fontWeight: "900", fontSize: 14 },
-
-  topReviewArtist: {
-    marginTop: 3,
-    color: "rgba(255,255,255,0.65)",
-    fontWeight: "800",
-  },
-
-  topReviewStarsLine: { marginTop: 8, flexDirection: "row", alignItems: "center" },
-
-  topReviewRatingNumber: {
-    marginLeft: 6,
-    color: "rgba(255,255,255,0.6)",
-    fontWeight: "900",
-    fontSize: 12,
-  },
-
-  // Bottom row (buttons left, username right)
-  topReviewBottomRow: {
-    marginTop: 12,
+  feedControlsRow: {
+    width: "100%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
 
-  topReviewBottomLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-
-  topReviewActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    gap: 8,
-  },
-
-  topReviewActionText: {
-    color: "rgba(255,255,255,0.9)",
-    fontWeight: "900",
-  },
-
-  topReviewIconOnlyBtn: {
+  viewToggleBtn: {
     width: 44,
     height: 44,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.07)",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "transparent",
   },
 
-  topReviewReviewerName: {
-    maxWidth: 130,
-    textAlign: "right",
-    color: "rgba(255,255,255,0.65)",
+  feedTabsRow: { flexDirection: "row", alignItems: "center" },
+
+  feedTabHitbox: { paddingVertical: 8, paddingHorizontal: 6 },
+
+  feedTabText: {
+    color: "rgba(255,255,255,0.70)",
     fontWeight: "900",
-    fontSize: 12,
+    fontSize: 15,
   },
 
-  /* =========================
-     TOP REVIEWS LOADING/ERROR TEXT
-     (referenced in Home)
-  ========================= */
+  feedTabTextActive: { color: COLORS.active || "#22c55e" },
+
+  feedTabDivider: {
+    marginHorizontal: 6,
+    color: "rgba(255,255,255,0.35)",
+    fontWeight: "900",
+  },
+
+  /* loading / errors */
   reviewLoaderRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     paddingVertical: 10,
   },
-
   reviewLoaderText: { color: COLORS.subtext, fontSize: 13 },
-
   reviewErrorText: { color: "#ff7a7a", paddingVertical: 8 },
-
   reviewEmptyText: { color: COLORS.subtext, paddingVertical: 8 },
+
+  /* =========================
+     COMPACT
+  ========================= */
+  feedCompactWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
+  },
+
+  // ✅ make cover a true 1:1 box (no stretching)
+  feedCompactThumbWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: COLORS.card || "rgba(255,255,255,0.06)",
+  },
+
+  // ✅ contain = never crop, never morph. may letterbox, but stays correct
+  feedCompactThumb: { width: "100%", height: "100%", resizeMode: "contain" },
+
+  feedCompactThumbFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  feedCompactThumbFallbackText: { color: "rgba(255,255,255,0.75)", fontWeight: "900" },
+
+  feedCompactRight: { flex: 1, marginLeft: 12 },
+
+  feedCompactMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+    justifyContent: "space-between", // helps the time sit right
+  },
+  feedCompactMetaUser: {
+    color: "rgba(255,255,255,0.85)",
+    fontWeight: "900",
+    fontSize: 12,
+    maxWidth: 220,
+  },
+  feedCompactMetaMuted: { color: "rgba(255,255,255,0.55)", fontWeight: "800", fontSize: 12 },
+
+  feedCompactTitle: { color: COLORS.text, fontWeight: "950", fontSize: 16, lineHeight: 20 },
+
+  // ✅ tighten spacing above actions
+  feedCompactSubRow: { marginTop: 2 },
+  feedCompactSubText: { color: "rgba(255,255,255,0.62)", fontWeight: "800", fontSize: 12 },
+
+  // ✅ less gap above like/comment row
+  feedCompactBottomRow: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  feedCompactActionsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+
+  // ✅ NO background, NO border
+  feedCompactActionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 0,
+    paddingVertical: 6,
+    borderRadius: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderColor: "transparent",
+  },
+  feedCompactActionText: { color: "rgba(255,255,255,0.9)", fontWeight: "950" },
+
+  /* =========================
+     CARD (no background/border)
+  ========================= */
+  feedCardWrap: {
+    marginBottom: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderColor: "transparent",
+    borderRadius: 0,
+  },
+
+  feedCardMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+    justifyContent: "space-between",
+  },
+  feedCardMetaUser: { color: "rgba(255,255,255,0.85)", fontWeight: "950", fontSize: 12 },
+  feedCardMetaMuted: { color: "rgba(255,255,255,0.55)", fontWeight: "800", fontSize: 12 },
+
+  feedCardTitle: { color: COLORS.text, fontWeight: "950", fontSize: 18, lineHeight: 22 },
+
+  feedCardBody: {
+    marginTop: 8,
+    color: "rgba(255,255,255,0.88)",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
+  },
+
+  // ✅ 1:1 media area + contain image
+  feedCardMediaWrap: {
+    marginTop: 12,
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: COLORS.card || "rgba(255,255,255,0.06)",
+  },
+  feedCardMedia: { width: "100%", height: "100%", resizeMode: "contain" },
+
+  feedCardMediaFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  feedCardMediaFallbackText: { color: "rgba(255,255,255,0.75)", fontWeight: "900" },
+
+  // ✅ tighten spacing above actions
+  feedCardSubRow: { marginTop: 8 },
+  feedCardSubText: { color: "rgba(255,255,255,0.62)", fontWeight: "800" },
+
+  // ✅ less gap above like/comment row
+  feedCardBottomRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  feedCardActionsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+
+  // ✅ NO background, NO border
+  feedCardActionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 0,
+    paddingVertical: 6,
+    borderRadius: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderColor: "transparent",
+  },
+  feedCardActionText: { color: "rgba(255,255,255,0.9)", fontWeight: "950" },
+
+  /* =========================
+     RATING BADGE (shared)
+  ========================= */
+  ratingBadge: {
+    minWidth: 42,
+    height: 42,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.20)",
+  },
+  ratingBadgeText: {
+    fontWeight: "999",
+    fontSize: 18,
+    letterSpacing: 0.2,
+    // color is injected dynamically in ReviewCard so it can "grade" the rating
+  },
 });

@@ -1,47 +1,90 @@
 // app/shared/hooks/review/useReviewDraft.js
 import { useMemo, useState } from "react";
-import { normalizeStars } from "../../lib/review/ratingScale";
 
-export default function useReviewDraft(initial = { stars: 0, title: "", content: "" }) {
+// ratingnumber is now 0.1–10.0 in 0.1 steps
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
+}
+function round1(n) {
+  return Math.round(n * 10) / 10;
+}
+function normalizeRating(v, min = 0.1, max = 10.0) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 5.0;
+  return clamp(round1(n), min, max);
+}
+
+export default function useReviewDraft(
+  initial = { ratingNumber: 5.0, title: "", content: "" }
+) {
   const [draft, setDraft] = useState({
-    stars: normalizeStars(initial?.stars || 0),
-    title: initial?.title || "",     // ✅ add title
+    ratingNumber: normalizeRating(initial?.ratingNumber ?? 5.0),
+    title: initial?.title || "",
     content: initial?.content || "",
   });
 
   const [errors, setErrors] = useState({});
 
-  const setStars = (v) => {
-    const next = normalizeStars(v);
-    setDraft((d) => ({ ...d, stars: next }));
-    setErrors((e) => ({ ...e, stars: next > 0 ? null : "Rating is required." }));
+  // ✅ ratingnumber setter
+  const setRatingnumber = (v) => {
+    const next = normalizeRating(v);
+    setDraft((d) => ({ ...d, ratingNumber: next }));
+    setErrors((e) => ({
+      ...e,
+      ratingnumber: next >= 0.1 ? null : "Rating is required.",
+    }));
   };
 
-  // ✅ add setTitle
-  const setTitle = (v) => setDraft((d) => ({ ...d, title: v }));
+  // ✅ title required setter
+  const setTitle = (v) => {
+    const next = String(v ?? "");
+    setDraft((d) => ({ ...d, title: next }));
+    setErrors((e) => ({
+      ...e,
+      title: next.trim().length > 0 ? null : "Title is required",
+    }));
+  };
 
   const setContent = (v) => setDraft((d) => ({ ...d, content: v }));
 
   const validate = () => {
     const nextErrors = {};
-    if (!draft.stars || draft.stars <= 0) nextErrors.stars = "Rating is required.";
+
+    const r = normalizeRating(draft.ratingNumber);
+    if (!Number.isFinite(r) || r < 0.1) nextErrors.ratingnumber = "Rating is required.";
+
+    if (!String(draft.title || "").trim()) nextErrors.title = "Title is required";
+
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
   const isValid = useMemo(() => {
-    return !!draft.stars && draft.stars > 0;
-  }, [draft.stars]);
+    const ratingOk =
+      Number.isFinite(draft.ratingNumber) && draft.ratingNumber >= 0.1;
+    const titleOk = String(draft.title || "").trim().length > 0;
+    return ratingOk && titleOk;
+  }, [draft.ratingNumber, draft.title]);
 
-  const reset = (next = { stars: 0, title: "", content: "" }) => {
+  const reset = (next = { ratingNumber: 5.0, title: "", content: "" }) => {
     setDraft({
-      stars: normalizeStars(next.stars || 0),
-      title: next.title || "",        // ✅ reset title
-      content: next.content || "",
+      ratingNumber: normalizeRating(next?.ratingNumber ?? 5.0),
+      title: next?.title || "",
+      content: next?.content || "",
     });
     setErrors({});
   };
 
-  // ✅ return setTitle too
-  return { draft, setStars, setTitle, setContent, errors, isValid, validate, reset };
+  return {
+    draft,
+    errors,
+    isValid,
+    validate,
+    reset,
+
+    // setters
+    setRatingnumber,
+    setTitle,
+    setContent,
+  };
 }

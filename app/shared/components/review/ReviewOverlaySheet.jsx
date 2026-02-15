@@ -1,6 +1,16 @@
 // app/shared/components/review/ReviewOverlaySheet.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  UIManager,
+  View,
+  findNodeHandle,
+} from "react-native";
 import { useSafeAreaInsets } from "../../imports";
 
 import ReviewForm from "./ReviewForm";
@@ -12,20 +22,85 @@ import useReviewSubmit from "../../hooks/review/useReviewSubmit";
 
 import { styles } from "./styles/styles";
 
-export default function ReviewOverlaySheet({ params, onRequestClose, onForceClose, setDirty }) {
+export default function ReviewOverlaySheet({
+  params,
+  onRequestClose,
+  onForceClose,
+  setDirty,
+}) {
   const insets = useSafeAreaInsets();
+
+  const scrollRef = useRef(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const [searchVisible, setSearchVisible] = useState(false);
   const [target, setTarget] = useState(null);
+  const [albumWarning, setAlbumWarning] = useState(false);
 
-  // ✅ Draft now includes title
-  const { draft, setStars, setTitle, setContent, errors, isValid, reset } = useReviewDraft({
-    stars: 0,
+  const {
+    draft,
+    setRatingnumber,
+    setTitle,
+    setContent,
+    errors,
+    validate,
+    reset,
+  } = useReviewDraft({
+    ratingNumber: 5.0,
     title: "",
     content: "",
   });
 
   const { submit, submitting, error: submitError } = useReviewSubmit();
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (e) => {
+      setKeyboardHeight(e?.endCoordinates?.height || 0);
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  /**
+   * ✅ FIX:
+   * measureLayout must be called with native handles.
+   * Using UIManager.measureLayout + findNodeHandle is the most reliable across RN versions/Fabric.
+   */
+  const scrollToInput = (inputRef) => {
+    const sv = scrollRef.current;
+    const node = inputRef?.current;
+    if (!sv || !node) return;
+
+    const scrollTag = findNodeHandle(sv);
+    const inputTag = findNodeHandle(node);
+
+    if (!scrollTag || !inputTag) return;
+
+    // iOS needs a tick after focus before measuring is accurate
+    requestAnimationFrame(() => {
+      UIManager.measureLayout(
+        inputTag,
+        scrollTag,
+        () => {},
+        (x, y, w, h) => {
+          const footerApprox = 92;
+          const padding = 14;
+
+          const targetY = Math.max(
+            0,
+            y + h - (keyboardHeight - padding) + footerApprox
+          );
+
+          sv.scrollTo?.({ y: targetY, animated: true });
+        }
+      );
+    });
+  };
 
   useEffect(() => {
     if (params?.item && (params?.spotifyType || params?.item?.spotifyType)) {
@@ -41,129 +116,159 @@ export default function ReviewOverlaySheet({ params, onRequestClose, onForceClos
       setSearchVisible(true);
     }
 
-    // ✅ reset includes title
-    reset({ stars: 0, title: "", content: "" });
+    setAlbumWarning(false);
+    reset({ ratingNumber: 5.0, title: "", content: "" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params?.spotifyType, params?.spotifyId, params?.item]);
 
   useEffect(() => {
     const dirty =
-      (draft?.stars || 0) > 0 ||
-      (draft?.title || "").trim().length > 0 ||
-      (draft?.content || "").trim().length > 0 ||
+      draft.ratingNumber !== 5.0 ||
+      (draft.title || "").trim().length > 0 ||
+      (draft.content || "").trim().length > 0 ||
       !!target;
 
     setDirty?.(dirty);
-  }, [draft?.stars, draft?.title, draft?.content, target, setDirty]);
-
-  const headerTitle = useMemo(() => {
-    if (!target) return "Add Review";
-    return target.targetType === "album" ? "Rate Album" : "Rate Song";
-  }, [target]);
+  }, [draft, target, setDirty]);
 
   const onPick = (payload) => {
     const t = normalizePickedTarget(payload);
-    if (!t) {
-      Alert.alert("Pick failed", "Missing spotify id/type.");
-      return;
-    }
+    if (!t) return;
+
     setTarget(t);
     setSearchVisible(false);
-    reset({ stars: 0, title: "", content: "" });
+    setAlbumWarning(false);
+    reset({ ratingNumber: 5.0, title: "", content: "" });
   };
 
   const onSubmit = async () => {
-    if (!target) {
-      Alert.alert("Missing selection", "Pick something to rate.");
-      return;
-    }
-    if (!isValid) {
-      Alert.alert("Fix errors", errors.stars || "Please complete the form.");
+    if (!target) return;
+
+    // server still song-only
+    if (target.targetType === "album") {
+      setAlbumWarning(true);
       return;
     }
 
-    // Helpful debug (remove later)
-    console.log("🚀 Review draft being submitted:", draft);
+    const ok = validate();
+    if (!ok) return;
 
-    await submit({ target, draft }); // ✅ draft now contains title
-    setDirty?.(false);
-    onForceClose?.();
+    try {
+      await submit({ target, draft });
+      setDirty?.(false);
+      onForceClose?.();
+    } catch (e) {
+      console.log("submit error", e);
+    }
   };
 
+  const keyboardOffset = Platform.OS === "ios" ? 10 : 0;
+
   return (
-    <View style={styles.screen}>
-      {/* Header row */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity onPress={onRequestClose} activeOpacity={0.8} style={styles.headerExitBtn}>
-          <Text style={styles.headerExitText}>Exit</Text>
-        </TouchableOpacity>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={keyboardOffset}
+    >
+      <View style={styles.screen}>
+        <SearchPickerSheet
+          visible={searchVisible}
+          onClose={(reason) => {
+            setSearchVisible(false);
+            if (reason !== "pick" && !target) onRequestClose?.();
+          }}
+          onPick={onPick}
+        />
 
-        <Text style={styles.headerTitle}>{headerTitle}</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+        <View style={{ flex: 1 }}>
+          {target ? (
+            <ScrollView
+              ref={scrollRef}
+              style={{ flex: 1 }}
+              stickyHeaderIndices={[0]}
+              keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+              keyboardShouldPersistTaps="handled"
+              contentInsetAdjustmentBehavior="always"
+              contentContainerStyle={[styles.content, { paddingBottom: 18 }]}
+            >
+              {/* Sticky navbar target card */}
+              <View style={styles.stickyTargetNav}>
+                <SelectedTargetCard
+                  target={target}
+                  onClosePress={() => {
+                    setTarget(null);
+                    setSearchVisible(true);
+                  }}
+                />
+              </View>
 
-      <SearchPickerSheet
-        visible={searchVisible}
-        onClose={(reason) => {
-          setSearchVisible(false);
-          if (reason !== "pick" && !target) onRequestClose?.();
-        }}
-        onPick={onPick}
-      />
+              {!!submitError && <Text style={styles.errorText}>{submitError}</Text>}
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: 14,
-            paddingBottom: insets.bottom + 24,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.title}>{headerTitle}</Text>
+              {albumWarning && (
+                <Text style={styles.inlineErrorUnderInput}>
+                  Album reviews are not supported yet
+                </Text>
+              )}
 
-        {!target && (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>Pick a song or album to rate.</Text>
-            <Text onPress={() => setSearchVisible(true)} style={styles.link}>
-              Open search
-            </Text>
-          </View>
-        )}
-
-        {!!submitError && <Text style={styles.errorText}>{submitError}</Text>}
-
-        {target && (
-          <>
-            <SelectedTargetCard
-              target={target}
-              onChangePress={() => setSearchVisible(true)}
-              onClosePress={() => {
-                setTarget(null);
-                setSearchVisible(true);
-              }}
-            />
-
-            <View style={{ marginTop: 10, opacity: submitting ? 0.75 : 1 }}>
               <ReviewForm
-                targetType={target.targetType}
-                stars={draft.stars}
-                setStars={setStars}
-                title={draft.title}       // ✅ wired
-                setTitle={setTitle}       // ✅ wired
+                ratingnumber={draft.ratingNumber}
+                setRatingnumber={setRatingnumber}
+                title={draft.title}
+                setTitle={setTitle}
                 content={draft.content}
                 setContent={setContent}
                 errors={errors}
                 submitting={submitting}
-                onSubmit={onSubmit}
+                targetType={target.targetType}
+                scrollToInput={scrollToInput} // ✅ uses UIManager.measureLayout now
               />
-            </View>
-          </>
-        )}
-      </ScrollView>
-    </View>
+            </ScrollView>
+          ) : (
+            <ScrollView
+              ref={scrollRef}
+              style={{ flex: 1 }}
+              keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+              keyboardShouldPersistTaps="handled"
+              contentInsetAdjustmentBehavior="always"
+              contentContainerStyle={[styles.content, { paddingBottom: 18 }]}
+            >
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>Pick a song to review.</Text>
+                <Text style={styles.link} onPress={() => setSearchVisible(true)}>
+                  Open search
+                </Text>
+              </View>
+            </ScrollView>
+          )}
+
+          {/* Footer in-layout (keyboard-friendly) */}
+          <View style={[styles.stickyActionBar, { paddingBottom: insets.bottom + 16 }]}>
+            <Pressable
+              onPress={onRequestClose}
+              style={({ pressed }) => [styles.stickyExitBtn, pressed && { opacity: 0.7 }]}
+              hitSlop={12}
+            >
+              <Text style={styles.stickyExitText}>Exit</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={onSubmit}
+              disabled={submitting}
+              style={({ pressed }) => [
+                styles.stickyReviewBtn,
+                submitting && styles.stickyReviewBtnDisabled,
+                pressed && !submitting && { opacity: 0.85 },
+              ]}
+              hitSlop={12}
+            >
+              <Text style={styles.stickyReviewText}>
+                {submitting ? "Meow..." : "Review"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -191,7 +296,9 @@ function normalizePickedTarget(payload) {
   const targetType = st === "album" ? "album" : "song";
 
   const title = item.title || item.name || "Untitled";
-  const subtitle = item.artist || item.artist_name || item.subtitle || item.album || "";
+  const subtitle =
+    item.artist || item.artist_name || item.subtitle || item.album || "";
+
   const imageUrl =
     item.imageUrl ||
     item.coverUrl ||

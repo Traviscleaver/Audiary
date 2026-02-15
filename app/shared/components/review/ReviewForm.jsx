@@ -1,12 +1,12 @@
 // app/shared/components/review/ReviewForm.jsx
-import React, { useMemo } from "react";
-import { Text, TextInput, TouchableOpacity, View } from "react-native";
-import StarRating from "./StarRating";
+import React, { useMemo, useRef } from "react";
+import { Text, TextInput, View } from "react-native";
+import RatingBar from "./RatingBar";
 import { styles } from "./styles/styles";
 
 export default function ReviewForm({
-  stars,
-  setStars,
+  ratingnumber,
+  setRatingnumber,
 
   title,
   setTitle,
@@ -16,61 +16,61 @@ export default function ReviewForm({
 
   errors = {},
   submitting = false,
-  onSubmit,
   targetType = "song",
+
+  scrollToInput, // ✅ provided by ReviewOverlaySheet
 }) {
+  const titleRef = useRef(null);
+  const contentRef = useRef(null);
+
   const placeholder = useMemo(() => {
     return targetType === "album"
       ? "Write your thoughts about this album (optional)…"
       : "Write your thoughts about this song (optional)…";
   }, [targetType]);
 
-  const titlePlaceholder = useMemo(() => {
-    return "Title";
-  }, []);
-
   return (
     <View style={{ marginTop: 14 }}>
-      <Text style={[styles.label, styles.labelSpacingBottom]}>Your rating</Text>
-
-      <StarRating value={stars} onChange={setStars} disabled={submitting} />
-
-      {!!errors.stars && <Text style={styles.errorText}>{errors.stars}</Text>}
-
-      <Text style={[styles.label, styles.labelSpacingTop]}>Title</Text>
-      <TextInput
-        value={title}
-        onChangeText={setTitle}
-        placeholder={titlePlaceholder}
-        placeholderTextColor={styles.label.color}
-        style={styles.titleInput}
-        editable={!submitting}
+      {/* Rating bar */}
+      <RatingBar
+        value={ratingnumber}
+        onChange={setRatingnumber}
+        disabled={submitting}
       />
 
-      <Text style={[styles.label, styles.labelSpacingTop]}>Review (optional)</Text>
+      {!!errors.ratingNumber && (
+        <Text style={styles.errorText}>{errors.ratingNumber}</Text>
+      )}
+
+      {/* Title input */}
       <TextInput
+        ref={titleRef}
+        value={title}
+        onChangeText={setTitle}
+        placeholder="Title"
+        placeholderTextColor={"rgba(255,255,255,0.45)"}
+        style={styles.titleInput}
+        editable={!submitting}
+        onFocus={() => scrollToInput?.(titleRef)}
+        returnKeyType="next"
+      />
+
+      {!!errors.title && (
+        <Text style={styles.inlineErrorUnderInput}>{errors.title}</Text>
+      )}
+
+      {/* Review input */}
+      <TextInput
+        ref={contentRef}
         value={content}
         onChangeText={setContent}
         placeholder={placeholder}
-        placeholderTextColor={styles.label.color}
+        placeholderTextColor={"rgba(255,255,255,0.45)"}
         multiline
         style={styles.textInput}
         editable={!submitting}
+        onFocus={() => scrollToInput?.(contentRef)}
       />
-
-      <TouchableOpacity
-        onPress={onSubmit}
-        disabled={submitting}
-        style={[
-          styles.saveBtn,
-          submitting ? styles.saveBtnDisabled : styles.saveBtnEnabled,
-        ]}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.saveBtnText}>
-          {submitting ? "Meow..." : "Review"}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }

@@ -8,7 +8,7 @@ import { encode as btoa } from "base-64";
 // ⚠️ DO NOT ship secrets in a mobile app.
 // Move token to backend, or load from secure env for development only.
 const CLIENT_ID = "c7d7aa47c5554dff888bf92c0a16928e";
-const CLIENT_SECRET = "1b7386a050114a7eaf57b6569e386d12";
+const CLIENT_SECRET = "f64f75cd19a1423cb96d6e7e7720bf8d";
 
 let _token = null;
 let _tokenExpiresAt = 0;
