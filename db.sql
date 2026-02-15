@@ -1,562 +1,255 @@
--- -- =========================================
--- -- USERS
--- -- =========================================
+BEGIN;
 
--- CREATE TABLE users (
---     user_id SERIAL PRIMARY KEY,
---     email VARCHAR(100) UNIQUE NOT NULL,
---     username VARCHAR(50) UNIQUE NOT NULL,
---     display_name VARCHAR(100),
---     avatar_url TEXT,
---     joined_at TIMESTAMP DEFAULT NOW()
--- );
+-- ===== ENUMS (edit values to match your app) =====
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'activity_type') THEN
+    CREATE TYPE activity_type AS ENUM (
+      'follow','like','comment','review','rating','favorite','message','playlist','diary'
+    );
+  END IF;
 
--- -- =========================================
--- -- ARTISTS (cached metadata from MusicBrainz)
--- -- =========================================
--- CREATE TABLE artists (
---     artist_id SERIAL PRIMARY KEY,
---     mbid UUID UNIQUE NOT NULL,
---     name VARCHAR(255),
---     image_url TEXT,
---     last_fetched TIMESTAMP DEFAULT NOW()
--- );
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'item_type') THEN
+    CREATE TYPE item_type AS ENUM ('Tracks','Albums','Artists');
+  END IF;
+END $$;
 
--- -- =========================================
--- -- ALBUMS
--- -- =========================================
--- CREATE TABLE albums (
---     album_id SERIAL PRIMARY KEY,
---     mbid UUID UNIQUE NOT NULL,
---     artist_id INT REFERENCES artists(artist_id) ON DELETE CASCADE,
---     title VARCHAR(255),
---     release_year INT,
---     cover_url TEXT,
---     last_fetched TIMESTAMP DEFAULT NOW()
--- );
-
--- -- =========================================
--- -- SONGS
--- -- =========================================
--- CREATE TABLE songs (
---     song_id SERIAL PRIMARY KEY,
---     mbid UUID UNIQUE NOT NULL,
---     album_id INT REFERENCES albums(album_id) ON DELETE CASCADE,
---     title VARCHAR(255),
---     duration INT, -- seconds
---     track_number INT,
---     spotify_url TEXT,
---     last_fetched TIMESTAMP DEFAULT NOW()
--- );
-
--- -- =========================================
--- -- PLAYLISTS
--- -- =========================================
--- CREATE TABLE playlists (
---     playlist_id SERIAL PRIMARY KEY,
---     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
---     title VARCHAR(255) NOT NULL,
---     description TEXT,
---     is_public BOOLEAN DEFAULT TRUE,
---     created_at TIMESTAMP DEFAULT NOW()
--- );
-
--- CREATE TABLE playlist_songs (
---     playlist_id INT REFERENCES playlists(playlist_id) ON DELETE CASCADE,
---     song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
---     position INT,
---     PRIMARY KEY (playlist_id, song_id)
--- );
-
--- -- =========================================
--- -- REVIEWS
--- -- =========================================
--- CREATE TABLE reviews (
---     review_id SERIAL PRIMARY KEY,
---     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
---     song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
---     rating NUMERIC(2,1) CHECK (rating >= 0 AND rating <= 10),
---     content TEXT,
---     created_at TIMESTAMP DEFAULT NOW(),
---     updated_at TIMESTAMP DEFAULT NOW()
--- );
-
--- -- =========================================
--- -- RATINGS (for ratings without text reviews)
--- -- =========================================
--- CREATE TABLE ratings (
---     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
---     song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
---     rating NUMERIC(2,1) CHECK (rating >= 0 AND rating <= 10),
---     rated_at TIMESTAMP DEFAULT NOW(),
---     PRIMARY KEY (user_id, song_id)
--- );
-
--- -- =========================================
--- -- DIARY ENTRIES (chronological listening log)
--- -- =========================================
--- CREATE TABLE diary_entries (
---     entry_id SERIAL PRIMARY KEY,
---     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
---     song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
---     listened_at TIMESTAMP DEFAULT NOW(),
---     rating NUMERIC(2,1),
---     review_id INT REFERENCES reviews(review_id) ON DELETE SET NULL,
---     notes TEXT
--- );
-
--- -- =========================================
--- -- FAVORITES
--- -- =========================================
--- CREATE TYPE favorite_type AS ENUM ('song', 'album', 'artist');
-
--- CREATE TABLE favorites (
---     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
---     item_type favorite_type NOT NULL,
---     item_id INT NOT NULL,
---     added_at TIMESTAMP DEFAULT NOW(),
---     PRIMARY KEY (user_id, item_type, item_id)
--- );
-
--- -- =========================================
--- -- ACTIVITY FEED (recent user actions)
--- -- =========================================
--- CREATE TYPE activity_type AS ENUM ('rating', 'review', 'playlist_add', 'favorite', 'diary_entry');
-
--- CREATE TABLE activities (
---     activity_id SERIAL PRIMARY KEY,
---     user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
---     type activity_type NOT NULL,
---     target_id INT,
---     description TEXT,
---     created_at TIMESTAMP DEFAULT NOW()
--- );
-
--- -- =========================================
--- -- USER STATS (cached aggregates)
--- -- =========================================
--- CREATE TABLE stats (
---     user_id INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
---     total_reviews INT DEFAULT 0,
---     total_ratings INT DEFAULT 0,
---     avg_rating NUMERIC(3,2) DEFAULT 0,
---     total_songs_listened INT DEFAULT 0,
---     total_artists INT DEFAULT 0,
---     last_updated TIMESTAMP DEFAULT NOW()
--- );
-
--- -- Run this *after* your existing schema
-
--- -- Store password hashes separately
--- CREATE TABLE IF NOT EXISTS auth_local (
---   user_id INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
---   password_hash TEXT NOT NULL
--- );
-
--- -- Useful indices/constraints
--- CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_idx ON users (LOWER(email));
--- CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx ON users (LOWER(username));
-
--- -- Optional (future-proof for OAuth like Google/Apple)
--- ALTER TABLE users
---   ADD COLUMN IF NOT EXISTS oauth_provider TEXT,
---   ADD COLUMN IF NOT EXISTS oauth_sub TEXT;
-
--- CREATE UNIQUE INDEX IF NOT EXISTS users_oauth_unique
---   ON users (oauth_provider, oauth_sub)
---   WHERE oauth_provider IS NOT NULL AND oauth_sub IS NOT NULL;
-
--- =========================================
--- USERS (core identity + auth metadata)
--- =========================================
-CREATE TABLE users (
-    user_id SERIAL PRIMARY KEY,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    display_name VARCHAR(100),
-    avatar_url TEXT,
-    joined_at TIMESTAMP DEFAULT NOW(),
-
-    oauth_provider TEXT,
-    oauth_sub TEXT
+-- ===== users =====
+CREATE TABLE IF NOT EXISTS users (
+  user_id        integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email          varchar,
+  username       varchar,
+  display_name   varchar,
+  avatar_url     text,
+  joined_at      timestamp without time zone DEFAULT now(),
+  oauth_provider text,
+  oauth_sub      text
 );
 
-CREATE UNIQUE INDEX users_email_lower_idx ON users (LOWER(email));
-CREATE UNIQUE INDEX users_username_lower_idx ON users (LOWER(username));
-
-CREATE UNIQUE INDEX users_oauth_unique
-    ON users (oauth_provider, oauth_sub)
-    WHERE oauth_provider IS NOT NULL AND oauth_sub IS NOT NULL;
-
-
--- =========================================
--- AUTH (local email/password)
--- =========================================
-CREATE TABLE auth_local (
-    user_id INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
-    password_hash TEXT NOT NULL
+-- ===== user_profiles =====
+CREATE TABLE IF NOT EXISTS user_profiles (
+  user_id      integer PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+  first_name   varchar,
+  last_name    varchar,
+  bio          text,
+  location     varchar,
+  website      varchar,
+  banner_url   text,
+  last_updated timestamp without time zone DEFAULT now()
 );
 
-
--- =========================================
--- USER PROFILES (extended info)
--- =========================================
-CREATE TABLE user_profiles (
-    user_id INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
-
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    bio TEXT,
-    location VARCHAR(150),
-    website VARCHAR(255),
-    banner_url TEXT,
-
-    last_updated TIMESTAMP DEFAULT NOW()
+-- ===== auth_local =====
+CREATE TABLE IF NOT EXISTS auth_local (
+  user_id        integer PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+  password_hash  text NOT NULL
 );
 
-CREATE INDEX user_profiles_location_idx ON user_profiles (location);
-
-
--- =========================================
--- SOCIAL: FOLLOWS (followers / following)
--- =========================================
-CREATE TABLE follows (
-    follower_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    following_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    followed_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (follower_id, following_id)
+-- ===== artists =====
+CREATE TABLE IF NOT EXISTS artists (
+  artist_id    integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  spotify_id   text,
+  mbid         uuid,
+  name         varchar,
+  image_url    text,
+  followers    integer,
+  genres       text[],
+  last_fetched timestamp without time zone
 );
 
-CREATE INDEX follows_following_idx ON follows (following_id);
-
-
--- =========================================
--- SOCIAL: USER BLOCKING
--- =========================================
-CREATE TABLE user_blocks (
-    blocker_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    blocked_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    blocked_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (blocker_id, blocked_id)
+-- ===== albums =====
+CREATE TABLE IF NOT EXISTS albums (
+  album_id      integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  spotify_id    text,
+  mbid          uuid,
+  artist_id     integer REFERENCES artists(artist_id) ON DELETE SET NULL,
+  title         varchar,
+  release_year  integer,
+  cover_url     text,
+  total_tracks  integer,
+  last_fetched  timestamp without time zone
 );
 
-
--- =========================================
--- ARTISTS (Spotify + MusicBrainz)
--- =========================================
-CREATE TABLE artists (
-    artist_id SERIAL PRIMARY KEY,
-
-    spotify_id TEXT UNIQUE,
-    mbid UUID UNIQUE,
-
-    name VARCHAR(255),
-    image_url TEXT,
-
-    followers INT,
-    genres TEXT[],
-
-    last_fetched TIMESTAMP DEFAULT NOW()
+-- ===== songs =====
+CREATE TABLE IF NOT EXISTS songs (
+  song_id      integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  spotify_id   text,
+  mbid         uuid,
+  album_id     integer REFERENCES albums(album_id) ON DELETE SET NULL,
+  title        varchar,
+  duration     integer,
+  track_number integer,
+  isrc         varchar,
+  popularity   integer,
+  preview_url  text,
+  spotify_url  text,
+  last_fetched timestamp without time zone
 );
 
-
--- =========================================
--- ALBUMS (Spotify + MusicBrainz)
--- =========================================
-CREATE TABLE albums (
-    album_id SERIAL PRIMARY KEY,
-
-    spotify_id TEXT UNIQUE,
-    mbid UUID UNIQUE,
-
-    artist_id INT REFERENCES artists(artist_id) ON DELETE CASCADE,
-
-    title VARCHAR(255),
-    release_year INT,
-    cover_url TEXT,
-    total_tracks INT,
-
-    last_fetched TIMESTAMP DEFAULT NOW()
+-- ===== song_artists (join) =====
+CREATE TABLE IF NOT EXISTS song_artists (
+  song_id   integer NOT NULL REFERENCES songs(song_id) ON DELETE CASCADE,
+  artist_id integer NOT NULL REFERENCES artists(artist_id) ON DELETE CASCADE,
+  PRIMARY KEY (song_id, artist_id)
 );
 
-
--- =========================================
--- SONGS (Spotify + MusicBrainz)
--- =========================================
-CREATE TABLE songs (
-    song_id SERIAL PRIMARY KEY,
-
-    spotify_id TEXT UNIQUE,
-    mbid UUID UNIQUE,
-
-    album_id INT REFERENCES albums(album_id) ON DELETE CASCADE,
-
-    title VARCHAR(255),
-    duration INT,
-    track_number INT,
-
-    isrc VARCHAR(50),
-    popularity INT,
-    preview_url TEXT,
-    spotify_url TEXT,
-
-    last_fetched TIMESTAMP DEFAULT NOW()
+-- ===== reviews =====
+CREATE TABLE IF NOT EXISTS reviews (
+  review_id  integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    integer REFERENCES users(user_id) ON DELETE CASCADE,
+  song_id    integer REFERENCES songs(song_id) ON DELETE SET NULL,
+  rating     numeric,
+  content    text,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  album_id   integer REFERENCES albums(album_id) ON DELETE SET NULL
 );
 
-
--- =========================================
--- MULTIPLE ARTISTS PER SONG (collabs)
--- =========================================
-CREATE TABLE song_artists (
-    song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
-    artist_id INT REFERENCES artists(artist_id) ON DELETE CASCADE,
-    PRIMARY KEY (song_id, artist_id)
+-- ===== comments =====
+CREATE TABLE IF NOT EXISTS comments (
+  comment_id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  review_id  integer REFERENCES reviews(review_id) ON DELETE CASCADE,
+  user_id    integer REFERENCES users(user_id) ON DELETE CASCADE,
+  content    text,
+  created_at timestamp without time zone DEFAULT now()
 );
 
-
--- =========================================
--- PLAYLISTS
--- =========================================
-CREATE TABLE playlists (
-    playlist_id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    is_public BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT NOW()
+-- ===== review_likes (join) =====
+CREATE TABLE IF NOT EXISTS review_likes (
+  review_id integer NOT NULL REFERENCES reviews(review_id) ON DELETE CASCADE,
+  user_id   integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  liked_at  timestamp without time zone DEFAULT now(),
+  PRIMARY KEY (review_id, user_id)
 );
 
-CREATE TABLE playlist_songs (
-    playlist_id INT REFERENCES playlists(playlist_id) ON DELETE CASCADE,
-    song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
-    position INT,
-    PRIMARY KEY (playlist_id, song_id)
+-- ===== diary_entries =====
+CREATE TABLE IF NOT EXISTS diary_entries (
+  entry_id     integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id      integer REFERENCES users(user_id) ON DELETE CASCADE,
+  song_id      integer REFERENCES songs(song_id) ON DELETE SET NULL,
+  listened_at  timestamp without time zone DEFAULT now(),
+  rating       numeric,
+  review_id    integer REFERENCES reviews(review_id) ON DELETE SET NULL,
+  notes        text
 );
 
-
--- =========================================
--- REVIEWS
--- =========================================
-CREATE TABLE reviews (
-    review_id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
-
-    rating NUMERIC(2,1) CHECK (rating >= 0 AND rating <= 10),
-    content TEXT,
-
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+-- ===== favorites (join-ish) =====
+CREATE TABLE IF NOT EXISTS favorites (
+  user_id    integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  item_type  item_type NOT NULL,
+  item_id    integer NOT NULL,
+  added_at   timestamp without time zone DEFAULT now(),
+  PRIMARY KEY (user_id, item_type, item_id)
 );
 
-CREATE INDEX reviews_user_idx ON reviews (user_id, created_at DESC);
-
-
--- =========================================
--- REVIEW LIKES
--- =========================================
-CREATE TABLE review_likes (
-    review_id INT REFERENCES reviews(review_id) ON DELETE CASCADE,
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    liked_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (review_id, user_id)
+-- ===== listen_later =====
+CREATE TABLE IF NOT EXISTS listen_later (
+  user_id   integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  song_id   integer NOT NULL REFERENCES songs(song_id) ON DELETE CASCADE,
+  added_at  timestamp without time zone DEFAULT now(),
+  PRIMARY KEY (user_id, song_id)
 );
 
-
--- =========================================
--- COMMENTS (on reviews)
--- =========================================
-CREATE TABLE comments (
-    comment_id SERIAL PRIMARY KEY,
-    review_id INT REFERENCES reviews(review_id) ON DELETE CASCADE,
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-
-    content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
+-- ===== follows =====
+CREATE TABLE IF NOT EXISTS follows (
+  follower_id  integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  following_id integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  followed_at  timestamp without time zone DEFAULT now(),
+  PRIMARY KEY (follower_id, following_id)
 );
 
-CREATE INDEX comments_review_idx ON comments (review_id);
-
-
--- =========================================
--- RATINGS (rating without review)
--- =========================================
-CREATE TABLE ratings (
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
-    rating NUMERIC(2,1) CHECK (rating >= 0 AND rating <= 10),
-    rated_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (user_id, song_id)
+-- ===== user_blocks =====
+CREATE TABLE IF NOT EXISTS user_blocks (
+  blocker_id integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  blocked_id integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  blocked_at timestamp without time zone DEFAULT now(),
+  PRIMARY KEY (blocker_id, blocked_id)
 );
 
-
--- =========================================
--- DIARY ENTRIES (listening log)
--- =========================================
-CREATE TABLE diary_entries (
-    entry_id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
-
-    listened_at TIMESTAMP DEFAULT NOW(),
-    rating NUMERIC(2,1),
-
-    review_id INT REFERENCES reviews(review_id) ON DELETE SET NULL,
-    notes TEXT
+-- ===== playlists =====
+CREATE TABLE IF NOT EXISTS playlists (
+  playlist_id  integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id      integer REFERENCES users(user_id) ON DELETE CASCADE,
+  title        varchar,
+  description  text,
+  is_public    boolean DEFAULT false,
+  created_at   timestamp without time zone DEFAULT now()
 );
 
-CREATE INDEX diary_user_idx ON diary_entries (user_id, listened_at DESC);
-
-
--- =========================================
--- FAVORITES (song, album, artist)
--- =========================================
-CREATE TYPE favorite_type AS ENUM ('song', 'album', 'artist');
-
-CREATE TABLE favorites (
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    item_type favorite_type NOT NULL,
-    item_id INT NOT NULL,
-    added_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (user_id, item_type, item_id)
+-- ===== playlist_songs =====
+CREATE TABLE IF NOT EXISTS playlist_songs (
+  playlist_id integer NOT NULL REFERENCES playlists(playlist_id) ON DELETE CASCADE,
+  song_id     integer NOT NULL REFERENCES songs(song_id) ON DELETE CASCADE,
+  position    integer,
+  PRIMARY KEY (playlist_id, song_id)
 );
 
-
--- =========================================
--- PINNED ITEMS (profile)
--- =========================================
-CREATE TABLE user_pins (
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    item_type favorite_type NOT NULL,
-    item_id INT NOT NULL,
-    pinned_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (user_id, item_type, item_id)
+-- ===== threads =====
+CREATE TABLE IF NOT EXISTS threads (
+  thread_id           integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  is_group            boolean DEFAULT false,
+  name                varchar,
+  created_by          integer REFERENCES users(user_id) ON DELETE SET NULL,
+  created_at          timestamp without time zone DEFAULT now(),
+  last_message_text   text,
+  last_message_sender integer REFERENCES users(user_id) ON DELETE SET NULL,
+  last_message_at     timestamp without time zone
 );
 
-
--- =========================================
--- LISTEN LATER
--- =========================================
-CREATE TABLE listen_later (
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    song_id INT REFERENCES songs(song_id) ON DELETE CASCADE,
-    added_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (user_id, song_id)
+-- ===== thread_members =====
+CREATE TABLE IF NOT EXISTS thread_members (
+  thread_id    integer NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
+  user_id      integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  joined_at    timestamp without time zone DEFAULT now(),
+  last_read_at timestamp without time zone,
+  PRIMARY KEY (thread_id, user_id)
 );
 
-
--- =========================================
--- NOTIFICATIONS
--- =========================================
-CREATE TABLE notifications (
-    notification_id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-
-    type TEXT NOT NULL,
-    payload JSONB,
-    is_read BOOLEAN DEFAULT FALSE,
-
-    created_at TIMESTAMP DEFAULT NOW()
+-- ===== messages =====
+CREATE TABLE IF NOT EXISTS messages (
+  message_id     integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  thread_id      integer REFERENCES threads(thread_id) ON DELETE CASCADE,
+  sender_id      integer REFERENCES users(user_id) ON DELETE SET NULL,
+  content        text,
+  attachment_url text,
+  created_at     timestamp without time zone DEFAULT now()
 );
 
-
--- =========================================
--- ACTIVITY FEED
--- =========================================
-CREATE TYPE activity_type AS ENUM (
-    'rating',
-    'review',
-    'playlist_add',
-    'favorite',
-    'diary_entry',
-    'follow'
+-- ===== message_reactions =====
+CREATE TABLE IF NOT EXISTS message_reactions (
+  message_id integer NOT NULL REFERENCES messages(message_id) ON DELETE CASCADE,
+  user_id    integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  reaction   text NOT NULL,
+  reacted_at timestamp without time zone DEFAULT now(),
+  PRIMARY KEY (message_id, user_id, reaction)
 );
 
-CREATE TABLE activities (
-    activity_id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-
-    type activity_type NOT NULL,
-    target_id INT,
-    description TEXT,
-
-    created_at TIMESTAMP DEFAULT NOW()
+-- ===== notifications =====
+CREATE TABLE IF NOT EXISTS notifications (
+  notification_id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id         integer REFERENCES users(user_id) ON DELETE CASCADE,
+  type            text,
+  payload         jsonb,
+  is_read         boolean DEFAULT false,
+  created_at      timestamp without time zone DEFAULT now()
 );
 
-CREATE INDEX activities_user_idx ON activities (user_id, created_at DESC);
-
-
--- =========================================
--- USER STATS (cached aggregates)
--- =========================================
-CREATE TABLE stats (
-    user_id INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
-
-    total_reviews INT DEFAULT 0,
-    total_ratings INT DEFAULT 0,
-    avg_rating NUMERIC(3,2) DEFAULT 0,
-    total_songs_listened INT DEFAULT 0,
-    total_artists INT DEFAULT 0,
-
-    last_updated TIMESTAMP DEFAULT NOW()
+-- ===== activities =====
+CREATE TABLE IF NOT EXISTS activities (
+  activity_id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id     integer REFERENCES users(user_id) ON DELETE CASCADE,
+  type        activity_type,
+  target_id   integer,
+  description text,
+  created_at  timestamp without time zone DEFAULT now()
 );
 
-
--- =========================================
--- MESSAGING: THREADS (DMs & group chats)
--- =========================================
-CREATE TABLE threads (
-    thread_id SERIAL PRIMARY KEY,
-    is_group BOOLEAN DEFAULT FALSE,
-    name VARCHAR(255),
-
-    created_by INT REFERENCES users(user_id),
-    created_at TIMESTAMP DEFAULT NOW(),
-
-    last_message_text TEXT,
-    last_message_sender INT REFERENCES users(user_id),
-    last_message_at TIMESTAMP
+-- ===== user_pins =====
+CREATE TABLE IF NOT EXISTS user_pins (
+  user_id    integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  item_type  item_type NOT NULL,
+  item_id    integer NOT NULL,
+  pinned_at  timestamp without time zone DEFAULT now(),
+  PRIMARY KEY (user_id, item_type, item_id)
 );
 
-
--- =========================================
--- MESSAGING: THREAD MEMBERS
--- =========================================
-CREATE TABLE thread_members (
-    thread_id INT REFERENCES threads(thread_id) ON DELETE CASCADE,
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-
-    joined_at TIMESTAMP DEFAULT NOW(),
-    last_read_at TIMESTAMP,
-
-    PRIMARY KEY (thread_id, user_id)
-);
-
-
--- =========================================
--- MESSAGING: MESSAGES
--- =========================================
-CREATE TABLE messages (
-    message_id SERIAL PRIMARY KEY,
-    thread_id INT REFERENCES threads(thread_id) ON DELETE CASCADE,
-    sender_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-
-    content TEXT,
-    attachment_url TEXT,
-
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX messages_thread_idx ON messages (thread_id, created_at DESC);
-
-
--- =========================================
--- MESSAGE REACTIONS
--- =========================================
-CREATE TABLE message_reactions (
-    message_id INT REFERENCES messages(message_id) ON DELETE CASCADE,
-    user_id INT REFERENCES users(user_id) ON DELETE CASCADE,
-    reaction TEXT,
-    reacted_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (message_id, user_id)
-);
+COMMIT;

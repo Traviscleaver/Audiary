@@ -36,6 +36,39 @@ async function fetchUserByUsername(username) {
 }
 
 // ===============================
+// GET /users/:username/picture
+// ===============================
+exports.getUserPicture = async (req, res) => {
+  try {
+    const username = String(req.params.username || "").trim();
+    if (!username) return res.status(400).json({ error: "Username is required" });
+
+    const result = await pool.query(
+      `
+      SELECT u.user_id, u.avatar_url
+      FROM users u
+      WHERE LOWER(u.username) = LOWER($1)
+      LIMIT 1
+      `,
+      [username]
+    );
+
+    const row = result.rows[0];
+    if (!row) return res.status(404).json({ error: "User not found" });
+
+    return res.json({
+      user_id: row.user_id,
+      avatar_url: row.avatar_url || null,
+    });
+  } catch (err) {
+    console.error("getUserPicture error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+
+// ===============================
 // GET /profile (self)
 // ===============================
 exports.getProfileSelf = async (req, res) => {
@@ -327,20 +360,15 @@ exports.getUserFavorites = async (req, res) => {
       SELECT
         f.item_type,
         f.item_id,
+        f.rank,
+        f.display,
         f.added_at,
 
-        -- unified display fields
         COALESCE(s.title, al.title, ar.name) AS title,
-
-        -- image to display
         COALESCE(al.cover_url, ar.image_url) AS image_url,
-
-        -- optional subtitle (artist name)
         COALESCE(ar2.name, ar.name) AS subtitle
 
       FROM favorites f
-
-      -- SONG favorite: join song -> album -> artist
       LEFT JOIN songs s
         ON f.item_type = 'song' AND s.song_id = f.item_id
       LEFT JOIN albums al
@@ -351,13 +379,11 @@ exports.getUserFavorites = async (req, res) => {
         )
       LEFT JOIN artists ar
         ON (f.item_type = 'artist' AND ar.artist_id = f.item_id)
-
-      -- artist for album/song (separate alias so we can subtitle songs/albums)
       LEFT JOIN artists ar2
         ON (al.artist_id = ar2.artist_id)
 
       WHERE f.user_id = $1
-      ORDER BY f.added_at DESC
+      ORDER BY f.rank ASC NULLS LAST, f.added_at DESC
       `,
       [user.user_id]
     );
@@ -543,13 +569,14 @@ exports.getFullProfile = async (req, res) => {
 
         pool.query(
           `
-          SELECT item_type, item_id, added_at
+          SELECT item_type, item_id, rank, display, added_at
           FROM favorites
           WHERE user_id = $1
-          ORDER BY added_at DESC
+          ORDER BY rank ASC NULLS LAST, added_at DESC
           `,
           [user.user_id]
         ),
+
 
         pool.query(
           `

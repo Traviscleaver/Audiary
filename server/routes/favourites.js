@@ -9,7 +9,8 @@ const {
   removeFavourite,
   getMyFavourites,
   existsFavouriteBySpotifyId,
-  countMyFavouritesByType, // ✅ make sure this exists
+  countMyFavouritesByType,
+  reorderFavourites,
 } = require("../controllers/favouritesController");
 
 // List my favourites
@@ -26,5 +27,9 @@ router.get("/favorites/exists", authRequired, existsFavouriteBySpotifyId);
 
 // ✅ COUNT ENDPOINT (this is the one you're missing)
 router.get("/favorites/count", authRequired, countMyFavouritesByType);
+
+router.post("/favorites/reorder", authRequired, reorderFavourites);
+
+
 
 module.exports = router;

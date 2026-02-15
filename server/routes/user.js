@@ -16,6 +16,7 @@ const {
   getUserFavorites,
   getUserActivity,
   getUserStats,
+  getUserPicture,
 
   getFullProfile, // GET /users/:username/full
   updateProfile, // PUT /profile (self edit)
@@ -77,6 +78,7 @@ router.get("/users/:username/diary", authOptional, getUserDiary);
 router.get("/users/:username/favorites", authOptional, getUserFavorites);
 router.get("/users/:username/activity", authOptional, getUserActivity);
 router.get("/users/:username/stats", authOptional, getUserStats);
+router.get("/users/:username/picture", authOptional, getUserPicture);
 
 /* =========================================
    OPTIONAL: FULL PROFILE BUNDLE

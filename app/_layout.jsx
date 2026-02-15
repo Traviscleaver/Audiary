@@ -1,16 +1,21 @@
 // app/_layout.jsx
+import "react-native-gesture-handler";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router";
 import React from "react";
+
 import { AuthProvider, useAuth } from "../lib/AuthContext";
 import { ReviewOverlayProvider } from "./shared/components/review/ReviewOverlayProvider";
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <ReviewOverlayProvider>
-        <RootStack />
-      </ReviewOverlayProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <ReviewOverlayProvider>
+          <RootStack />
+        </ReviewOverlayProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }
 

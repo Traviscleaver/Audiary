@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import { Dimensions } from "react-native";
-import { updateProfile } from "../../../../lib/api.js";
+import { updateProfile, uploadMyAvatar } from "../../../../lib/api.js";
 import { useAuth } from "../../../../lib/AuthContext.js";
 
 import {
@@ -13,7 +13,6 @@ import {
   useSafeAreaInsets,
 } from "../../../shared/imports";
 
-import { logout } from "../../../shared/utils/logout";
 import useFavouriteData from "../../hooks/useFavouriteData";
 
 import BlockedOverlay from "./BlockedOverlay";
@@ -43,7 +42,7 @@ export default function SettingsOverlay(props) {
     bio,
     setBio,
     openBioOverlay,
-    pronoun,
+    pronoun, // currently unused
 
     avatarUrl,
     setAvatarUrl,
@@ -54,7 +53,7 @@ export default function SettingsOverlay(props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const { setAuthToken } = useAuth();
+  const { setAuthToken, saveProfile } = useAuth();
   const { setFavourites } = useFavouriteData();
 
   const [activityOn, setActivityOn] = useState(true);
@@ -66,6 +65,9 @@ export default function SettingsOverlay(props) {
   const subAnim = useState(() => new Animated.Value(0))[0];
 
   const [signingOut, setSigningOut] = useState(false);
+
+  // ✅ avatar upload busy state (prevents double taps)
+  const [avatarBusy, setAvatarBusy] = useState(false);
 
   const openSubOverlay = (key) => {
     setSubOverlay(key);
@@ -79,6 +81,67 @@ export default function SettingsOverlay(props) {
     );
   };
 
+  // =========================
+  // ✅ Avatar handlers (Option A)
+  // =========================
+
+  // Called after user selects/takes a photo (local file uri)
+  const onUpdateProfileImage = async (localUri) => {
+    if (!localUri || avatarBusy) return;
+
+    const prev = avatarUrl;
+    setAvatarBusy(true);
+
+    // Optimistic preview immediately
+    setAvatarUrl(localUri);
+
+    try {
+      // Upload to your server, server uploads to Supabase Storage, returns updated user
+      const res = await uploadMyAvatar(localUri);
+
+      if (res?.user) {
+        await saveProfile(res.user);   // persist to AuthContext + SecureStore
+        onSave?.(res.user);            // update Profile screen draft state
+        setAvatarUrl(res.user.avatar_url || ""); // ensure we show remote URL
+      }
+    } catch (err) {
+      console.error("Avatar upload error:", err);
+      alert(err?.error || err?.message || "Failed to upload picture.");
+      setAvatarUrl(prev || "");
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const onRemoveProfileImage = async () => {
+    if (avatarBusy) return;
+
+    const prev = avatarUrl;
+    setAvatarBusy(true);
+
+    // Optimistic clear
+    setAvatarUrl("");
+
+    try {
+      // This clears avatar_url in DB. (Optional: also delete object in storage later)
+      const res = await updateProfile({ avatar_url: null });
+
+      if (res?.user) {
+        await saveProfile(res.user);
+        onSave?.(res.user);
+      }
+    } catch (err) {
+      console.error("Avatar remove error:", err);
+      alert(err?.error || err?.message || "Failed to remove picture.");
+      setAvatarUrl(prev || "");
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  // =========================
+  // Save full settings
+  // =========================
   const handleSave = async () => {
     try {
       const trimmedHandle = handle?.trim() || null;
@@ -100,7 +163,11 @@ export default function SettingsOverlay(props) {
       };
 
       const res = await updateProfile(payload);
-      if (onSave && res?.user) onSave(res.user);
+
+      if (res?.user) {
+        await saveProfile(res.user);
+        onSave?.(res.user);
+      }
 
       closeSettings();
     } catch (err) {
@@ -110,23 +177,19 @@ export default function SettingsOverlay(props) {
     }
   };
 
-  // ✅ logout now lives here
+  // ✅ logout lives here
   const handleSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
 
     try {
-      // close local UI layers
       if (passwordPopupOpen) setPasswordPopupOpen(false);
       if (subOverlay) setSubOverlay(null);
 
-      // clear UI cache immediately
       if (typeof setFavourites === "function") setFavourites([]);
 
-      // clear auth + storage
       await setAuthToken(null);
 
-      // navigate away
       router.replace("/LoginScreen");
     } catch (e) {
       console.log("LOGOUT FAILED:", e);
@@ -199,6 +262,12 @@ export default function SettingsOverlay(props) {
         onOpenPassword={() => setPasswordPopupOpen(true)}
         onOpenBlocked={() => openSubOverlay("blocked")}
         onSignOut={handleSignOut}
+
+        // ✅ NEW: profile picture controls
+        profileImageUri={avatarUrl || null}
+        onUpdateProfileImage={onUpdateProfileImage}
+        onRemoveProfileImage={onRemoveProfileImage}
+        avatarBusy={avatarBusy} // optional if you want to disable UI
       />
 
       {subOverlay === "blocked" && (
