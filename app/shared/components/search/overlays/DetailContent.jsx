@@ -1,7 +1,9 @@
 // app/shared/components/search/overlays/DetailContent.jsx
 import { useEffect, useRef, useState } from "react";
+import { favouritesExistsBySpotify } from "../../../../../lib/api";
 import {
   ActivityIndicator,
+  Alert,
   COLORS,
   Feather,
   FontAwesome,
@@ -10,14 +12,12 @@ import {
   ScrollView,
   SIZES,
   Text,
-  Alert,
   TouchableOpacity,
   useSafeAreaInsets,
   View,
 } from "../../../imports";
-import { favouritesExistsBySpotify } from "../../../../../lib/api";
 import FavoriteButton from "../../favouriteButton";
-import { useRouter } from "expo-router";
+import { useReviewOverlay } from "../../review/ReviewOverlayProvider";
 
 export default function DetailContent({
   type,
@@ -29,9 +29,12 @@ export default function DetailContent({
   scrollRef,
   scrollYRef,
   openSubDetail,
+
+  // ✅ NEW: allow parent overlay to disable scrolling during swipe-back
+  scrollEnabled = true,
 }) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const { openReview } = useReviewOverlay();
 
   if (!item) return null;
 
@@ -46,37 +49,32 @@ export default function DetailContent({
   const subtitle = type === "Artists" ? "" : item.artist || item.album;
 
   const canOpenTrack = typeof openSubDetail === "function";
-  const spotifyId = item.id || null;
+  const spotifyId = item.id || item.spotifyId || null;
 
   const [initialFavorite, setInitialFavorite] = useState(false);
   const [favDbId, setFavDbId] = useState(null);
 
-  // small in-memory cache so it doesn't spam when rerendering
-  const existsCacheRef = useRef(new Map()); // key -> { exists, item_id, at }
+  const existsCacheRef = useRef(new Map());
 
-const canAddFavouriteOrAlert = async () => {
-  try {
-    const r = await favouritesCountByType(type);
-    if ((r?.count ?? 0) >= 3) {
-      Alert.alert(
-        "Favourite limit reached",
-        `You can only have 3 favourite ${
-          type === "Tracks" ? "songs" : type === "Albums" ? "albums" : "artists"
-        }.`
-      );
-      return false;
+  const canAddFavouriteOrAlert = async () => {
+    try {
+      const r = await favouritesCountByType(type);
+      if ((r?.count ?? 0) >= 3) {
+        Alert.alert(
+          "Favourite limit reached",
+          `You can only have 3 favourite ${
+            type === "Tracks" ? "songs" : type === "Albums" ? "albums" : "artists"
+          }.`
+        );
+        return false;
+      }
+      return true;
+    } catch (e) {
+      const msg = String(e?.message || "");
+      if (msg.includes("404")) return true;
+      return true;
     }
-    return true;
-  } catch (e) {
-    // ✅ If endpoint doesn't exist yet (404), don't block
-    const msg = String(e?.message || "");
-    if (msg.includes("404")) return true;
-
-    // Otherwise also don't block (server will enforce max)
-    return true;
-  }
-};
-
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -87,7 +85,6 @@ const canAddFavouriteOrAlert = async () => {
       const key = `${type}::${spotifyId}`;
       const cached = existsCacheRef.current.get(key);
 
-      // cache for 60 seconds to avoid repeated calls while navigating/scrolling
       if (cached && Date.now() - cached.at < 60_000) {
         setInitialFavorite(!!cached.exists);
         setFavDbId(cached.item_id ?? null);
@@ -103,44 +100,46 @@ const canAddFavouriteOrAlert = async () => {
         setFavDbId(res.item_id ?? null);
       } catch (e) {
         if (cancelled) return;
-        // don't block UI if this fails
         setInitialFavorite(false);
         setFavDbId(null);
       }
     }
 
     loadExists();
-
     return () => {
       cancelled = true;
     };
   }, [type, spotifyId]);
 
-
   const onRatePress = () => {
     try {
       if (!spotifyId) return;
 
-      if (type === "Tracks") {
-        router.push({
-          pathname: "/review",
-          params: { targetType: "song", spotifyId },
-        });
+      if (type !== "Tracks" && type !== "Albums") {
+        Alert.alert("Not supported", "Artists can’t be rated yet.");
         return;
       }
 
-      if (type === "Albums") {
-        router.push({
-          pathname: "/review",
-          params: { targetType: "album", spotifyId },
-        });
-        return;
-      }
+      const spotifyType = type === "Albums" ? "album" : "track";
 
-      Alert.alert("cant rate artist, remove this option");
+      openReview({
+        spotifyType,
+        spotifyId,
+        item: {
+          spotifyId,
+          title: item.title || item.name,
+          subtitle:
+            type === "Tracks"
+              ? item.artist || item.album || ""
+              : item.artist || "",
+          imageUrl: hero,
+          spotifyUrl: item.spotifyUrl,
+          raw: item,
+        },
+      });
     } catch (err) {
       console.log("onRatePress error:", err);
-      Alert.alert("Couldn’t open", "Something went wrong opening the review screen.");
+      Alert.alert("Couldn’t open", "Something went wrong opening the review overlay.");
     }
   };
 
@@ -150,6 +149,7 @@ const canAddFavouriteOrAlert = async () => {
     <ScrollView
       ref={scrollRef}
       style={{ flex: 1 }}
+      scrollEnabled={scrollEnabled} // ✅ NEW
       contentContainerStyle={{
         paddingHorizontal: 16,
         paddingBottom: SIZES.footerHeight + 50,
@@ -197,8 +197,6 @@ const canAddFavouriteOrAlert = async () => {
           </Text>
         </View>
       )}
-
-
 
       {/* RATINGS */}
       <View style={styles.ratingsRow}>
@@ -267,8 +265,6 @@ const canAddFavouriteOrAlert = async () => {
       {/* TRACKLIST */}
       {type === "Albums" && (
         <View style={{ marginTop: 5 }}>
-
-
           {loading ? (
             <View style={styles.trackLoader}>
               <ActivityIndicator size="large" color={COLORS.text} />
@@ -289,34 +285,32 @@ const canAddFavouriteOrAlert = async () => {
 
                 return (
                   <View key={`${t.id}-${idx}`} style={styles.trackRow}>
-                    {/* ✅ removed track number column */}
-
                     <TouchableOpacity
                       style={{ flex: 1, paddingRight: 10 }}
                       disabled={!canOpenTrack}
                       onPress={() => {
                         if (!canOpenTrack) return;
 
-                        openSubDetail({
-                          id: t.id,
-                          name: t.name,
-                          artist: artistNames,
-                          coverUrl: hero,
-                          album: title,
-                          spotifyUrl: t.spotifyUrl,
-                        },
-                        "Tracks"
-                      );
+                        openSubDetail(
+                          {
+                            id: t.id,
+                            spotifyId: t.id,
+                            name: t.name,
+                            artist: artistNames,
+                            coverUrl: hero,
+                            album: title,
+                            spotifyUrl: t.spotifyUrl,
+                          },
+                          "Tracks"
+                        );
                       }}
                     >
                       <Text style={styles.trackTitle}>{t.name}</Text>
-
                       {!!artistNames && (
                         <Text style={styles.trackArtist}>{artistNames}</Text>
                       )}
                     </TouchableOpacity>
 
-                    {/* stars left, play right */}
                     <View style={styles.trackButtonsRow}>
                       <View style={styles.trackRatingRow}>
                         <FontAwesome name="star" size={18} color={COLORS.gold} />
@@ -330,7 +324,6 @@ const canAddFavouriteOrAlert = async () => {
                         style={styles.trackPlayButton}
                         activeOpacity={0.85}
                       >
-                        {/* ✅ filled play icon */}
                         <FontAwesome name="play" size={14} color="#000000ff" />
                       </TouchableOpacity>
                     </View>
@@ -364,11 +357,7 @@ const canAddFavouriteOrAlert = async () => {
 
 const styles = {
   heroWrap: { alignItems: "center", marginTop: 8 },
-  hero: {
-    width: 220,
-    height: 220,
-    backgroundColor: COLORS.field,
-  },
+  hero: { width: 220, height: 220, backgroundColor: COLORS.field },
 
   titleWrap: { alignItems: "flex-start", marginTop: 18 },
   detailTitle: { color: COLORS.text, fontSize: 22, fontWeight: "800" },
@@ -391,7 +380,6 @@ const styles = {
     borderColor: COLORS.divider,
     paddingBottom: 15,
     borderBottomWidth: 1,
-
   },
   rateButton: {
     flex: 1,
@@ -419,23 +407,14 @@ const styles = {
   },
   playButtonText: { color: "#000000ff", fontWeight: "800" },
 
-  ratingsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 18,
-  },
+  ratingsRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 18 },
   ratingCol: { alignItems: "center", flex: 1 },
   ratingNumber: { color: COLORS.text, fontWeight: "900", fontSize: 18 },
   ratingLabel: { color: COLORS.subtext, marginTop: 6, fontSize: 12 },
   starRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 
   trackLoader: { marginTop: 20, alignItems: "center" },
-
-  trackRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-  },
+  trackRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
   trackTitle: { color: COLORS.text, fontWeight: "800" },
   trackArtist: { color: COLORS.subtext, marginTop: 4 },
 

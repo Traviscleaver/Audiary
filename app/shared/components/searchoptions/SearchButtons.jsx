@@ -1,6 +1,6 @@
 // app/home/components/HomeButtons.jsx
-import { Text, TouchableOpacity, View } from "../../shared/imports";
-import { styles } from "../styles/styles";
+import { Text, TouchableOpacity, View } from "../../imports";
+import { styles } from "./styles/styles";
 
 export default function HomeButtons({ onPress }) {
   return (

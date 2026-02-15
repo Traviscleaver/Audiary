@@ -2,17 +2,17 @@
 import { useWindowDimensions } from "react-native";
 
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Text,
-  TouchableOpacity,
-  View,
-} from "../../shared/imports";
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Text,
+    TouchableOpacity,
+    View,
+} from "../../imports";
 
-import { ALBUMS_TAB, TRACKS_TAB } from "../libs/constants";
-import { getPopularSectionState } from "../styles/selectors";
-import { styles } from "../styles/styles";
+import { ALBUMS_TAB, TRACKS_TAB } from "../../lib/constants";
+import { getPopularSectionState } from "./styles/selectors";
+import { styles } from "./styles/styles";
 
 function getColumns(width) {
   if (width >= 1024) return 5;

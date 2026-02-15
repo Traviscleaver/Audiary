@@ -9,16 +9,16 @@ const {
   upsertReview,
   getReviewById,
   listReviewsForSong,
-  listReviewsForAlbum,
+  listTopReviewsWeekly, // ✅
   updateReview,
   deleteReview,
   likeReview,
   unlikeReview,
 } = require("../controllers/reviewController");
 
-// Lists (must come before /:reviewId to avoid route conflicts)
+// ✅ Put specific routes BEFORE "/:reviewId"
+router.get("/top", authOptional, listTopReviewsWeekly);
 router.get("/songs/:songId", authOptional, listReviewsForSong);
-router.get("/albums/:albumId", authOptional, listReviewsForAlbum);
 
 // Create/Upsert
 router.post("/", authRequired, upsertReview);
@@ -27,7 +27,7 @@ router.post("/", authRequired, upsertReview);
 router.post("/:reviewId/like", authRequired, likeReview);
 router.delete("/:reviewId/like", authRequired, unlikeReview);
 
-// Read single
+// Read single (must be after /top)
 router.get("/:reviewId", authOptional, getReviewById);
 
 // Update/Delete (owner)

@@ -1,5 +1,5 @@
 // app/shared/components/search/sections/SearchResultsSection.jsx
-import { FlatList, Text, TouchableOpacity, View } from "react-native";
+import { Alert, FlatList, Text, TouchableOpacity, View } from "react-native";
 import { COLORS } from "../../../imports";
 import SearchResultRow from "../rows/SearchResultRow";
 
@@ -14,6 +14,17 @@ export default function SearchResultsSection({
 
   const variant = type === "Artists" ? "artist" : "default";
 
+  const handleViewAll = () => {
+    if (typeof onViewAll !== "function") {
+      Alert.alert(
+        "View all not wired",
+        "onViewAll is missing in the parent search screen. Pass onViewAll(type) into this section."
+      );
+      return;
+    }
+    onViewAll(type);
+  };
+
   return (
     <View style={styles.section}>
       <Text style={styles.title}>{title}</Text>
@@ -21,7 +32,7 @@ export default function SearchResultsSection({
       <FlatList
         data={data}
         scrollEnabled={false}
-        keyExtractor={(i) => String(i.id)}
+        keyExtractor={(i, idx) => String(i?.id ?? i?.spotifyId ?? idx)}
         renderItem={({ item }) => (
           <SearchResultRow
             item={item}
@@ -31,7 +42,7 @@ export default function SearchResultsSection({
         )}
       />
 
-      <TouchableOpacity onPress={() => onViewAll(type)} style={styles.viewAllBtn}>
+      <TouchableOpacity onPress={handleViewAll} style={styles.viewAllBtn}>
         <Text style={styles.viewAllText}>View all {title.toLowerCase()}...</Text>
       </TouchableOpacity>
     </View>
