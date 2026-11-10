@@ -1,4 +1,6 @@
-# Welcome to your GEEK LAND👋
+# Audiary - Letterboxd but for Music! 
+
+** Due To New Spotify API Changes. The API is no longer working, therefor the app is non functional. They only allow apps with over 250,000 concurrent users to use their API now. **
 
 1. Install dependencies
 
